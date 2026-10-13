@@ -3,6 +3,8 @@ import axios from 'axios';
 
 interface AuthCardProps {
   currentLang: 'en' | 'bn';
+  onOpenDashboard?: () => void;
+  onSellerChange?: (seller: SellerProfile | null) => void;
 }
 
 interface SellerProfile {
@@ -13,7 +15,7 @@ interface SellerProfile {
   tier?: string;
 }
 
-export default function AuthCard({ currentLang }: AuthCardProps) {
+export default function AuthCard({ currentLang, onOpenDashboard, onSellerChange }: AuthCardProps) {
   const [authMode, setAuthMode] = useState<'password' | 'sms' | 'register' | 'qr'>('password');
   const [account, setAccount] = useState('');
   const [password, setPassword] = useState('');
@@ -103,6 +105,8 @@ export default function AuthCard({ currentLang }: AuthCardProps) {
         if (seller) {
           localStorage.setItem('packbang_seller_user', JSON.stringify(seller));
           setLoggedInSeller(seller);
+          if (onSellerChange) onSellerChange(seller);
+          if (onOpenDashboard) onOpenDashboard();
         }
 
         setStatusMessage({
@@ -169,6 +173,7 @@ export default function AuthCard({ currentLang }: AuthCardProps) {
     localStorage.removeItem('packbang_seller_user');
     setLoggedInSeller(null);
     setStatusMessage(null);
+    if (onSellerChange) onSellerChange(null);
   };
 
   // If already logged in, show authenticated dashboard badge
@@ -212,7 +217,7 @@ export default function AuthCard({ currentLang }: AuthCardProps) {
             type="button"
             className="sign-in-button"
             style={{ marginBottom: '12px' }}
-            onClick={() => alert('Redirecting to Seller Dashboard (Packaging Inventory & Orders)...')}
+            onClick={() => { if (onOpenDashboard) onOpenDashboard(); }}
           >
             {currentLang === 'bn' ? 'ড্যাশবোর্ডে প্রবেশ করুন' : 'GO TO SELLER DASHBOARD'}
           </button>

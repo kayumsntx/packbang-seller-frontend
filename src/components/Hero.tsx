@@ -2,9 +2,11 @@ import AuthCard from './AuthCard';
 
 interface HeroProps {
   currentLang: 'en' | 'bn';
+  onOpenDashboard?: () => void;
+  onSellerChange?: (seller: any) => void;
 }
 
-export default function Hero({ currentLang }: HeroProps) {
+export default function Hero({ currentLang, onOpenDashboard, onSellerChange }: HeroProps) {
   return (
     <section className="page-banner" id="hero-section">
       <div className="packbang-login-content">
@@ -61,7 +63,7 @@ export default function Hero({ currentLang }: HeroProps) {
 
             {/* Right Column Auth Card */}
             <div className="hero-right-col">
-              <AuthCard currentLang={currentLang} />
+              <AuthCard currentLang={currentLang} onOpenDashboard={onOpenDashboard} onSellerChange={onSellerChange} />
             </div>
 
           </div>

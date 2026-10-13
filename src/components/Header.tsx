@@ -3,9 +3,11 @@ import { useState, useEffect } from 'react';
 interface HeaderProps {
   currentLang: 'en' | 'bn';
   onLangChange: (lang: 'en' | 'bn') => void;
+  seller?: any;
+  onOpenDashboard?: () => void;
 }
 
-export default function Header({ currentLang, onLangChange }: HeaderProps) {
+export default function Header({ currentLang, onLangChange, seller, onOpenDashboard }: HeaderProps) {
   const [solid, setSolid] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
 
@@ -56,6 +58,31 @@ export default function Header({ currentLang, onLangChange }: HeaderProps) {
           </div>
 
           {/* Language Switcher */}
+          {seller && (
+            <div className="header-center-navs-content">
+              <button
+                type="button"
+                onClick={onOpenDashboard}
+                style={{
+                  background: 'var(--pb-primary)',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '6px 14px',
+                  borderRadius: '16px',
+                  fontWeight: 800,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <span>📦</span>
+                <span>{currentLang === 'bn' ? 'ড্যাশবোর্ড' : 'Dashboard'}</span>
+              </button>
+            </div>
+          )}
+
           <div className={`dada-switch-language ${langOpen ? 'open' : ''}`}>
             <button
               type="button"
