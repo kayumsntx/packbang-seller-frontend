@@ -34,8 +34,16 @@ export default function AuthCard({ currentLang }: AuthCardProps) {
     }
   });
 
-  // Base API URL (uses Vite proxy /api or direct port 5000)
-  const API_URL = 'http://localhost:5000/api/auth';
+  // Dynamic API URL: live production (seller.packbang.com) & local dev
+  const API_BASE =
+    import.meta.env.VITE_API_URL ||
+    import.meta.env.VITE_API_BASE_URL ||
+    (typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? 'http://localhost:5000'
+      : 'https://packbang-seller-backend.onrender.com');
+
+  const API_URL = `${API_BASE.replace(/\/$/, '')}/api/auth`;
 
   useEffect(() => {
     if (countdown <= 0) return;
