@@ -62,6 +62,12 @@ export default function SellerDashboard({
   const [notification, setNotification] = useState<string | null>(null);
   const [isLoadingBids, setIsLoadingBids] = useState(false);
   const [isSubmittingBid, setIsSubmittingBid] = useState(false);
+  const [sellerChatModalItem, setSellerChatModalItem] = useState<CustomBidRequest | null>(null);
+  const [sellerChatMessages, setSellerChatMessages] = useState<any[]>([]);
+  const [chatMessageText, setChatMessageText] = useState('');
+  const [chatFilterWarning, setChatFilterWarning] = useState<string | null>(null);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
   // Store API base URL for live bidding sync
   const storeApiUrl = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
@@ -274,6 +280,80 @@ export default function SellerDashboard({
       setBidAmount('');
       setIsSubmittingBid(false);
       showToast(currentLang === 'bn' ? 'পাইকারি অর্ডারে আপনার কোটেশন জমা হয়েছে!' : 'Wholesale quotation bid submitted successfully!');
+    }
+  };
+
+  const openSellerChat = async (item: CustomBidRequest) => {
+    setSellerChatModalItem(item);
+    setChatMessageText('');
+    setChatFilterWarning(null);
+    setIsLoadingMessages(true);
+    try {
+      const res = await fetch(`${storeApiUrl}/api/public/custom-order/${item.id}/messages?sellerId=${encodeURIComponent(seller.id || seller.phone || 'seller')}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.messages)) {
+        setSellerChatMessages(data.messages);
+      } else {
+        setSellerChatMessages([]);
+      }
+    } catch (err) {
+      console.warn('Failed to load chat messages:', err);
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  };
+
+  const handleChatInputChange = (val: string) => {
+    setChatMessageText(val);
+
+    const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})|(\b[a-zA-Z0-9._%+-]+\s*(at|@|\[at\]|\(at\))\s*[a-zA-Z0-9.-]+\s*(dot|\.|\(dot\)|\bcom\b|\bnet\b))/i;
+    const bengaliDigits: Record<string, string> = {'০':'0','১':'1','২':'2','৩':'3','৪':'4','৫':'5','৬':'6','৭':'7','৮':'8','৯':'9'};
+    const normalized = val.replace(/[০-৯]/g, d => bengaliDigits[d] || d);
+    const digitsOnly = normalized.replace(/\D/g, '');
+
+    const hasPhone = /(^|01|8801|\+8801)[3-9]\d{8}/.test(digitsOnly) || (digitsOnly.length >= 10 && /(01[3-9]\d{8})/.test(digitsOnly));
+    const hasEmail = emailRegex.test(val);
+    const hasSocialOrOffsite = /\b(whatsapp|wa\.me|imo|telegram|viber|skype|call\s*me|phone\s*me|my\s*number|bkash|nagad|rocket|meet\s*me|deal\s*outside|যোগাযোগ|ফোন|নাম্বার|কল\s*দিন)\b/i.test(normalized);
+
+    if (hasEmail || hasPhone || hasSocialOrOffsite) {
+      setChatFilterWarning(hasEmail
+        ? '⚠️ Sharing email addresses is not permitted to protect buyer and seller safety.'
+        : (hasPhone
+            ? '⚠️ Direct phone numbers cannot be shared. Keep all communication inside PackBang.'
+            : '⚠️ External contacts (WhatsApp, Imo, bKash, offline deals) are strictly prohibited.'));
+    } else {
+      setChatFilterWarning(null);
+    }
+  };
+
+  const handleSendSellerMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sellerChatModalItem || !chatMessageText.trim() || chatFilterWarning) return;
+
+    setIsSendingMessage(true);
+    try {
+      const res = await fetch(`${storeApiUrl}/api/public/custom-order/${sellerChatModalItem.id}/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sellerId: seller.id || ('SELLER-' + (seller.phone || 'supplier')),
+          sellerName: seller.shopName || 'Verified Packaging Supplier',
+          text: chatMessageText.trim()
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setChatMessageText('');
+        if (data.chatMessage) {
+          setSellerChatMessages(prev => [...prev, data.chatMessage]);
+        }
+      } else {
+        alert(data.message || 'Message blocked or failed');
+      }
+    } catch (err) {
+      alert('Network error sending message');
+    } finally {
+      setIsSendingMessage(false);
     }
   };
 
@@ -821,6 +901,26 @@ export default function SellerDashboard({
                         <div style={{ fontSize: '18px', fontWeight: 900, color: '#FF5A1F' }}>
                           ৳ {b.bidPlaced.toFixed(2)} / pc
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => openSellerChat(b)}
+                          style={{
+                            marginTop: '8px',
+                            background: '#EFF6FF',
+                            color: '#1D4ED8',
+                            border: '1px solid #BFDBFE',
+                            padding: '6px 14px',
+                            borderRadius: '8px',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          💬 Chat with Customer
+                        </button>
                       </div>
                     ) : (
                       <button
@@ -998,6 +1098,147 @@ export default function SellerDashboard({
       )}
 
       {/* Modal: Submit Bid */}
+      {/* SELLER SAFE CHAT MODAL */}
+      {sellerChatModalItem && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 99999,
+          padding: '16px'
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '540px',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.25)',
+            display: 'flex',
+            flexDirection: 'column',
+            maxHeight: '90vh',
+            overflow: 'hidden'
+          }}>
+            {/* Header */}
+            <div style={{ padding: '16px 20px', background: '#0F172A', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 800 }}>Chat with {sellerChatModalItem.buyer}</h4>
+                <span style={{ fontSize: '12px', color: '#94A3B8' }}>Request #{sellerChatModalItem.id}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSellerChatModalItem(null)}
+                style={{ background: 'none', border: 'none', color: '#94A3B8', fontSize: '22px', cursor: 'pointer' }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Warning Shield */}
+            <div style={{ background: '#FFFBEB', borderBottom: '1px solid #FEF3C7', padding: '10px 16px', fontSize: '12px', color: '#92400E', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+              <span>🛡️</span>
+              <div>
+                <strong>Safe Messaging Policy</strong>
+                <p style={{ margin: 0, lineHeight: 1.3 }}>Direct sharing of phone numbers, emails, WhatsApp, or offline payments is strictly prohibited.</p>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '16px 20px', background: '#F8FAFC', display: 'flex', flexDirection: 'column', gap: '10px', minHeight: '240px', maxHeight: '340px' }}>
+              {isLoadingMessages ? (
+                <div style={{ textAlign: 'center', color: '#94A3B8', margin: 'auto' }}>Loading messages...</div>
+              ) : sellerChatMessages.length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#94A3B8', margin: 'auto' }}>No messages yet. Greet the customer and clarify requirements.</div>
+              ) : (
+                sellerChatMessages.map((m, idx) => {
+                  const isMe = m.senderRole === 'seller';
+                  const isSys = m.senderId === 'SYSTEM';
+                  if (isSys) {
+                    return (
+                      <div key={idx} style={{ background: '#F1F5F9', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', color: '#475569', textAlign: 'center', margin: 'auto' }}>
+                        ℹ️ {m.text}
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={idx} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+                      <div style={{
+                        maxWidth: '80%',
+                        padding: '9px 13px',
+                        borderRadius: '12px',
+                        background: isMe ? '#FF5A1F' : '#FFFFFF',
+                        color: isMe ? '#FFFFFF' : '#0F172A',
+                        border: isMe ? 'none' : '1px solid #E2E8F0',
+                        fontSize: '13px'
+                      }}>
+                        <div style={{ fontSize: '10px', fontWeight: 800, opacity: 0.8, marginBottom: '2px' }}>{m.senderName}</div>
+                        <div>{m.text}</div>
+                        <div style={{ fontSize: '9px', opacity: 0.7, textAlign: 'right', marginTop: '2px' }}>
+                          {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Filter Warning */}
+            {chatFilterWarning && (
+              <div style={{ background: '#FEF2F2', padding: '8px 16px', color: '#DC2626', fontSize: '12px', fontWeight: 700, borderTop: '1px solid #FEE2E2' }}>
+                {chatFilterWarning}
+              </div>
+            )}
+
+            {/* Input Form */}
+            <form onSubmit={handleSendSellerMessage} style={{ padding: '12px 16px', background: '#fff', borderTop: '1px solid #E2E8F0' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+                <textarea
+                  value={chatMessageText}
+                  onChange={e => handleChatInputChange(e.target.value)}
+                  placeholder="Type a message regarding paper GSM, sample approval, or production timeline..."
+                  rows={2}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    fontSize: '13px',
+                    resize: 'none',
+                    outline: 'none'
+                  }}
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={isSendingMessage || !!chatFilterWarning || !chatMessageText.trim()}
+                  style={{
+                    background: '#FF5A1F',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    height: '40px',
+                    opacity: (isSendingMessage || !!chatFilterWarning || !chatMessageText.trim()) ? 0.5 : 1
+                  }}
+                >
+                  {isSendingMessage ? 'Sending...' : 'Send'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {bidModalItem && (
         <div style={{
           position: 'fixed',
