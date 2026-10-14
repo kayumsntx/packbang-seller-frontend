@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export interface SellerProfile {
   id: string;
@@ -44,6 +44,8 @@ interface CustomBidRequest {
   quantity: number;
   targetBudget: string;
   bidPlaced?: number;
+  deadline?: string;
+  images?: string[];
 }
 
 export default function SellerDashboard({
@@ -58,6 +60,49 @@ export default function SellerDashboard({
   const [bidModalItem, setBidModalItem] = useState<CustomBidRequest | null>(null);
   const [bidAmount, setBidAmount] = useState('');
   const [notification, setNotification] = useState<string | null>(null);
+  const [isLoadingBids, setIsLoadingBids] = useState(false);
+  const [isSubmittingBid, setIsSubmittingBid] = useState(false);
+
+  // Store API base URL for live bidding sync
+  const storeApiUrl = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+    ? 'http://localhost:8000'
+    : 'https://packbang.com';
+
+  const fetchApprovedOrders = async () => {
+    setIsLoadingBids(true);
+    try {
+      const res = await fetch(`${storeApiUrl}/api/public/approved-custom-orders`);
+      if (!res.ok) throw new Error('Failed to fetch approved orders');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.orders) && data.orders.length > 0) {
+        const liveOrders: CustomBidRequest[] = data.orders.map((o: any) => {
+          const existingBid = o.bids?.find(
+            (b: any) => b.sellerId === seller.id || b.sellerName === seller.shopName
+          );
+          return {
+            id: o.id,
+            buyer: o.customerName || 'PackBang Customer',
+            location: o.customerPhone ? 'Verified Phone' : 'Bangladesh',
+            requestText: (o.title ? `${o.title} - ` : '') + (o.description || 'Custom packaging printing order'),
+            quantity: o.quantity || 1,
+            targetBudget: o.budget ? `৳ ${o.budget}` : 'Negotiable',
+            bidPlaced: existingBid ? existingBid.amount : undefined,
+            deadline: o.deadline ? new Date(o.deadline).toLocaleDateString() : undefined,
+            images: o.images || []
+          };
+        });
+        setBids(liveOrders);
+      }
+    } catch (err) {
+      console.warn('Live order sync note:', err);
+    } finally {
+      setIsLoadingBids(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchApprovedOrders();
+  }, [activeTab]);
 
   // Initial Packaging Inventory
   const [products, setProducts] = useState<ProductItem[]>([
@@ -202,14 +247,34 @@ export default function SellerDashboard({
     showToast(currentLang === 'bn' ? 'নতুন প্যাকেজিং আইটেম সফলভাবে যোগ করা হয়েছে!' : 'New packaging product added successfully!');
   };
 
-  const handlePlaceBid = (e: React.FormEvent) => {
+  const handlePlaceBid = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bidModalItem || !bidAmount) return;
 
-    setBids(bids.map(b => b.id === bidModalItem.id ? { ...b, bidPlaced: parseFloat(bidAmount) } : b));
-    setBidModalItem(null);
-    setBidAmount('');
-    showToast(currentLang === 'bn' ? 'পাইকারি অর্ডারে আপনার কোটেশন জমা হয়েছে!' : 'Wholesale quotation bid submitted successfully!');
+    setIsSubmittingBid(true);
+    const amountNum = parseFloat(bidAmount);
+
+    try {
+      await fetch(`${storeApiUrl}/api/public/custom-order/${bidModalItem.id}/bid`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sellerId: seller.id || ('SELLER-' + (seller.phone || Date.now())),
+          sellerName: seller.shopName || 'Verified Packaging Supplier',
+          amount: amountNum,
+          deliveryTime: '3-5 Days',
+          note: `Factory quotation from ${seller.shopName || 'packaging manufacturer'}`
+        })
+      });
+    } catch (err) {
+      console.warn('Bid submission sync note:', err);
+    } finally {
+      setBids(bids.map(b => b.id === bidModalItem.id ? { ...b, bidPlaced: amountNum } : b));
+      setBidModalItem(null);
+      setBidAmount('');
+      setIsSubmittingBid(false);
+      showToast(currentLang === 'bn' ? 'পাইকারি অর্ডারে আপনার কোটেশন জমা হয়েছে!' : 'Wholesale quotation bid submitted successfully!');
+    }
   };
 
   return (
@@ -680,13 +745,38 @@ export default function SellerDashboard({
         {/* TAB 3: CUSTOM WHOLESALE BIDS */}
         {activeTab === 'bids' && (
           <div>
-            <div style={{ marginBottom: '18px' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px 0' }}>
-                {currentLang === 'bn' ? 'লাইভ পাইকারি ও কাস্টম প্রিন্টিং রিকোয়েস্ট' : 'Live Wholesale & Custom Printing Requests'}
-              </h3>
-              <p style={{ margin: 0, fontSize: '13px', color: '#64748B' }}>
-                Online stores in Bangladesh are requesting bulk quotes. Submit your factory prices directly.
-              </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>{currentLang === 'bn' ? 'লাইভ পাইকারি ও কাস্টম প্রিন্টিং রিকোয়েস্ট' : 'Live Wholesale & Custom Printing Requests'}</span>
+                  <span style={{ background: '#FF5A1F', color: '#fff', fontSize: '11px', padding: '2px 8px', borderRadius: '12px', fontWeight: 800 }}>
+                    {bids.length} Active
+                  </span>
+                </h3>
+                <p style={{ margin: 0, fontSize: '13px', color: '#64748B' }}>
+                  Online stores in Bangladesh are requesting bulk quotes. Submit your factory prices directly.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={fetchApprovedOrders}
+                disabled={isLoadingBids}
+                style={{
+                  background: '#EFF6FF',
+                  color: '#1D4ED8',
+                  border: '1px solid #BFDBFE',
+                  padding: '7px 14px',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                🔄 {isLoadingBids ? (currentLang === 'bn' ? 'লোড হচ্ছে...' : 'Refreshing...') : (currentLang === 'bn' ? 'রিফ্রেশ করুন' : 'Refresh Requests')}
+              </button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -963,9 +1053,10 @@ export default function SellerDashboard({
                 </button>
                 <button
                   type="submit"
-                  style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', background: '#FF5A1F', color: '#fff', cursor: 'pointer', fontWeight: 700 }}
+                  disabled={isSubmittingBid}
+                  style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', background: '#FF5A1F', color: '#fff', cursor: 'pointer', fontWeight: 700, opacity: isSubmittingBid ? 0.7 : 1 }}
                 >
-                  Submit Quote
+                  {isSubmittingBid ? 'Submitting...' : 'Submit Quote'}
                 </button>
               </div>
             </form>
