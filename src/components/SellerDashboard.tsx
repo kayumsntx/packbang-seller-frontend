@@ -341,6 +341,21 @@ export default function SellerDashboard({
           text: chatMessageText.trim()
         })
       });
+
+      if (!res.ok) {
+        let errData: any;
+        try { errData = await res.json(); } catch (_) {}
+        if (errData && errData.message) {
+          alert(errData.message);
+          return;
+        }
+        if (res.status === 404) {
+          alert('Backend service is updating. Please deploy latest commit on Render or wait a moment.');
+          return;
+        }
+        throw new Error('HTTP ' + res.status);
+      }
+
       const data = await res.json();
       if (data.success) {
         setChatMessageText('');
@@ -350,8 +365,9 @@ export default function SellerDashboard({
       } else {
         alert(data.message || 'Message blocked or failed');
       }
-    } catch (err) {
-      alert('Network error sending message');
+    } catch (err: any) {
+      console.error('Chat send error:', err);
+      alert('Network error sending message: ' + (err.message || 'Please check connection or backend deployment status.'));
     } finally {
       setIsSendingMessage(false);
     }
