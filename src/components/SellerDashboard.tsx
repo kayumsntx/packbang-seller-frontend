@@ -21,9 +21,15 @@ interface ProductItem {
   name: string;
   category: string;
   unitPrice: number;
+  originalPrice?: number;
   stock: number;
   moq: number;
+  unit?: string;
+  imagePath?: string;
+  images?: string[];
+  description?: string;
   status: 'in_stock' | 'low_stock' | 'out_of_stock';
+  isActive?: boolean;
 }
 
 interface OrderItem {
@@ -106,9 +112,84 @@ export default function SellerDashboard({
     }
   };
 
+  
+  const fetchSellerProducts = async () => {
+    setIsLoadingProducts(true);
+    try {
+      const res = await fetch(`${storeApiUrl}/api/seller/products?sellerId=${encodeURIComponent(seller.id)}&sellerPhone=${encodeURIComponent(seller.phone)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.products) && data.products.length > 0) {
+          const mapped: ProductItem[] = data.products.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            category: p.category || 'General',
+            unitPrice: p.price || 0,
+            originalPrice: p.originalPrice || undefined,
+            stock: p.stock || 0,
+            moq: p.moq || 1,
+            unit: p.unit || 'pcs',
+            imagePath: p.imagePath || (p.images && p.images[0]) || '/uploads/default.jpg',
+            images: p.images || [],
+            description: p.description || '',
+            status: p.stock > 10 ? 'in_stock' : (p.stock > 0 ? 'low_stock' : 'out_of_stock'),
+            isActive: p.isActive !== false
+          }));
+          setProducts(mapped);
+        }
+      }
+    } catch (err) {
+      console.warn('Live products sync warning:', err);
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch(`${storeApiUrl}/api/seller/categories`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.categories) && data.categories.length > 0) {
+          const names = Array.from(new Set(data.categories.map((c: any) => c.name).filter(Boolean))) as string[];
+          if (names.length > 0) setCategoriesList(names);
+        }
+      }
+    } catch (e) {}
+  };
+
   useEffect(() => {
     fetchApprovedOrders();
-  }, [activeTab]);
+    fetchSellerProducts();
+    fetchCategories();
+  }, [activeTab, seller.id]);
+
+  // Live Marketplace Products Integration
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+  const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
+  const [categoriesList, setCategoriesList] = useState<string[]>([
+    'Courier Poly',
+    'Bubble Wrap',
+    'Carton Boxes',
+    'Stickers & Tape',
+    'Gift Packets',
+    'Security Seals',
+    'Mailing Bags'
+  ]);
+  const [productSearch, setProductSearch] = useState('');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('All');
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState('All');
+
+  // Edit Product Modal State
+  const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null);
+
+  // Form Fields for Add Product
+  const [newOriginalPrice, setNewOriginalPrice] = useState('');
+  const [newUnit, setNewUnit] = useState('pcs');
+  const [newDescription, setNewDescription] = useState('');
+  const [newImageUrls, setNewImageUrls] = useState<string[]>([]);
+  const [imageInputVal, setImageInputVal] = useState('');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   // Initial Packaging Inventory
   const [products, setProducts] = useState<ProductItem[]>([
@@ -224,33 +305,150 @@ export default function SellerDashboard({
   const [newCategory, setNewCategory] = useState('Courier Poly');
   const [newPrice, setNewPrice] = useState('');
   const [newStock, setNewStock] = useState('');
-  const [newMoq] = useState('50');
+  const [newMoq, setNewMoq] = useState('50');
 
   const showToast = (msg: string) => {
     setNotification(msg);
     setTimeout(() => setNotification(null), 3500);
   };
 
-  const handleAddProduct = (e: React.FormEvent) => {
+  const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProductName || !newPrice || !newStock) return;
+    if (!newProductName.trim() || !newPrice || !newStock) {
+      showToast(currentLang === 'bn' ? 'অনুগ্রহ করে আবশ্যক তথ্য পূরণ করুন' : 'Please fill all required fields');
+      return;
+    }
 
-    const item: ProductItem = {
-      id: 'PK-' + Math.floor(100 + Math.random() * 900),
-      name: newProductName,
-      category: newCategory,
-      unitPrice: parseFloat(newPrice),
-      stock: parseInt(newStock),
-      moq: parseInt(newMoq) || 1,
-      status: parseInt(newStock) > 20 ? 'in_stock' : 'low_stock'
-    };
+    setIsSubmittingProduct(true);
+    try {
+      const payload = {
+        name: newProductName.trim(),
+        category: newCategory,
+        price: parseFloat(newPrice),
+        originalPrice: newOriginalPrice ? parseFloat(newOriginalPrice) : undefined,
+        stock: parseInt(newStock) || 0,
+        moq: parseInt(newMoq) || 1,
+        unit: newUnit,
+        description: newDescription.trim(),
+        images: newImageUrls.length > 0 ? newImageUrls : ['https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=600&auto=format&fit=crop&q=80'],
+        sellerId: seller.id,
+        sellerName: seller.shopName || 'PackBang Verified Factory',
+        sellerPhone: seller.phone
+      };
 
-    setProducts([item, ...products]);
-    setShowAddModal(false);
-    setNewProductName('');
-    setNewPrice('');
-    setNewStock('');
-    showToast(currentLang === 'bn' ? 'নতুন প্যাকেজিং আইটেম সফলভাবে যোগ করা হয়েছে!' : 'New packaging product added successfully!');
+      const res = await fetch(`${storeApiUrl}/api/seller/products/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (data.success && data.product) {
+        showToast(currentLang === 'bn' ? 'পণ্যটি লাইভ ক্যাটালগে পোস্ট হয়েছে!' : 'Product listed live on PackBang marketplace!');
+        setShowAddModal(false);
+        setNewProductName('');
+        setNewPrice('');
+        setNewOriginalPrice('');
+        setNewStock('');
+        setNewDescription('');
+        setNewImageUrls([]);
+        fetchSellerProducts();
+      } else {
+        throw new Error(data.message || 'Failed to create product');
+      }
+    } catch (err: any) {
+      console.error('Add product error:', err);
+      showToast(err.message || 'Error publishing product');
+    } finally {
+      setIsSubmittingProduct(false);
+    }
+  };
+
+  const handleUpdateProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+
+    setIsSubmittingProduct(true);
+    try {
+      const res = await fetch(`${storeApiUrl}/api/seller/products/${editingProduct.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editingProduct.name,
+          price: editingProduct.unitPrice,
+          originalPrice: editingProduct.originalPrice,
+          stock: editingProduct.stock,
+          moq: editingProduct.moq,
+          unit: editingProduct.unit,
+          category: editingProduct.category,
+          description: editingProduct.description
+        })
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        showToast(currentLang === 'bn' ? 'পণ্য সফলভাবে আপডেট করা হয়েছে!' : 'Product updated successfully!');
+        setEditingProduct(null);
+        fetchSellerProducts();
+      } else {
+        showToast(data.message || 'Update failed');
+      }
+    } catch (err) {
+      showToast('Error updating product');
+    } finally {
+      setIsSubmittingProduct(false);
+    }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    if (!window.confirm(currentLang === 'bn' ? 'আপনি কি নিশ্চিত এই পণ্যটি ডিলিট করতে চান?' : 'Are you sure you want to remove this product from marketplace listing?')) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`${storeApiUrl}/api/seller/products/${id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(currentLang === 'bn' ? 'পণ্য ডিলিট সম্পন্ন হয়েছে' : 'Product removed successfully');
+        setProducts(prev => prev.filter(p => p.id !== id));
+      } else {
+        showToast(data.message || 'Failed to delete');
+      }
+    } catch (e) {
+      showToast('Error removing product');
+    }
+  };
+
+  const handleImageFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploadingImage(true);
+    const formData = new FormData();
+    for (let i = 0; i < Math.min(files.length, 5); i++) {
+      formData.append('productImages', files[i]);
+    }
+
+    try {
+      const res = await fetch(`${storeApiUrl}/api/seller/products/upload-image`, {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.urls)) {
+        setNewImageUrls(prev => [...prev, ...data.urls]);
+        showToast('Image(s) uploaded successfully!');
+      } else {
+        showToast('Image upload failed');
+      }
+    } catch (err) {
+      showToast('Image upload error');
+    } finally {
+      setIsUploadingImage(false);
+      e.target.value = '';
+    }
   };
 
   const handlePlaceBid = async (e: React.FormEvent) => {
@@ -756,84 +954,313 @@ export default function SellerDashboard({
 
         {/* TAB 2: PACKAGING INVENTORY */}
         {activeTab === 'products' && (
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: '14px',
-            padding: '24px',
-            border: '1px solid #E2E8F0',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-              <div>
-                <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 4px 0' }}>
-                  {currentLang === 'bn' ? 'কারখানা স্টক ও আইটেম তালিকা' : 'Packaging Factory Inventory'}
-                </h3>
-                <p style={{ margin: 0, fontSize: '13px', color: '#64748B' }}>
-                  Total {products.length} active wholesale listings
-                </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Top Stat Summary Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '16px' }}>
+              <div style={{ background: '#FFFFFF', padding: '18px 20px', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ width: '46px', height: '46px', borderRadius: '10px', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>📦</div>
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>Total Listings</div>
+                  <div style={{ fontSize: '22px', fontWeight: 800, color: '#0F172A' }}>{products.length}</div>
+                </div>
               </div>
 
-              <button
-                onClick={() => setShowAddModal(true)}
-                style={{
-                  background: '#FF5A1F',
-                  color: '#fff',
-                  border: 'none',
-                  padding: '10px 18px',
-                  borderRadius: '8px',
-                  fontWeight: 700,
-                  fontSize: '13px',
-                  cursor: 'pointer'
-                }}
-              >
-                + {currentLang === 'bn' ? 'নতুন আইটেম যোগ করুন' : 'Add Item'}
-              </button>
+              <div style={{ background: '#FFFFFF', padding: '18px 20px', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ width: '46px', height: '46px', borderRadius: '10px', background: '#ECFDF5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>💰</div>
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>In-Stock Valuation</div>
+                  <div style={{ fontSize: '22px', fontWeight: 800, color: '#059669' }}>
+                    ৳ {products.reduce((acc, p) => acc + (p.unitPrice * p.stock), 0).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ background: '#FFFFFF', padding: '18px 20px', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ width: '46px', height: '46px', borderRadius: '10px', background: '#FEF2F2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>⚠️</div>
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>Low Stock Alert</div>
+                  <div style={{ fontSize: '22px', fontWeight: 800, color: '#DC2626' }}>
+                    {products.filter(p => p.stock <= 20).length}
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
-                <thead>
-                  <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', color: '#475569' }}>
-                    <th style={{ padding: '12px 16px' }}>SKU</th>
-                    <th style={{ padding: '12px 16px' }}>Item Name</th>
-                    <th style={{ padding: '12px 16px' }}>Category</th>
-                    <th style={{ padding: '12px 16px' }}>Unit Price</th>
-                    <th style={{ padding: '12px 16px' }}>Stock Available</th>
-                    <th style={{ padding: '12px 16px' }}>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map(p => (
-                    <tr key={p.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                      <td style={{ padding: '14px 16px', fontWeight: 800, color: '#64748B' }}>{p.id}</td>
-                      <td style={{ padding: '14px 16px', fontWeight: 700, color: '#0F172A' }}>{p.name}</td>
-                      <td style={{ padding: '14px 16px' }}>
-                        <span style={{ background: '#F1F5F9', padding: '3px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 600 }}>
-                          {p.category}
-                        </span>
-                      </td>
-                      <td style={{ padding: '14px 16px', fontWeight: 800, color: '#FF5A1F' }}>
-                        ৳ {p.unitPrice.toFixed(2)}
-                      </td>
-                      <td style={{ padding: '14px 16px', fontWeight: 700 }}>
-                        {p.stock.toLocaleString()} pcs
-                      </td>
-                      <td style={{ padding: '14px 16px' }}>
-                        <span style={{
-                          padding: '4px 10px',
-                          borderRadius: '12px',
-                          fontSize: '12px',
-                          fontWeight: 800,
-                          background: p.status === 'in_stock' ? '#DEF7EC' : '#FDE8E8',
-                          color: p.status === 'in_stock' ? '#03543F' : '#9B1C1C'
-                        }}>
-                          {p.status === 'in_stock' ? 'In Stock' : 'Low Stock'}
-                        </span>
-                      </td>
-                    </tr>
+            {/* Inventory Container */}
+            <div style={{
+              background: '#FFFFFF',
+              borderRadius: '14px',
+              padding: '24px',
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
+            }}>
+              {/* Header and Action Bar */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
+                <div>
+                  <h3 style={{ fontSize: '20px', fontWeight: 800, margin: '0 0 4px 0', color: '#0F172A' }}>
+                    {currentLang === 'bn' ? 'ফ্যাক্টরি প্যাকেজিং ইনভেন্টরি' : 'Factory Packaging Catalog & Inventory'}
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#64748B' }}>
+                    {currentLang === 'bn'
+                      ? 'এখানে যোগ করা পণ্য সরাসরি packbang.com ক্যাটালগে ক্রেতারা দেখতে ও অর্ডার করতে পারবেন।'
+                      : 'Products listed here are instantly published to packbang.com storefront for customer orders.'}
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <button
+                    onClick={fetchSellerProducts}
+                    title="Refresh product list"
+                    style={{
+                      background: '#F1F5F9',
+                      border: '1px solid #CBD5E1',
+                      borderRadius: '8px',
+                      padding: '10px 14px',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      fontSize: '13px',
+                      color: '#475569'
+                    }}
+                  >
+                    🔄 {isLoadingProducts ? 'Loading...' : 'Refresh'}
+                  </button>
+
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    style={{
+                      background: 'linear-gradient(135deg, #FF5A1F, #E64A19)',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '11px 20px',
+                      borderRadius: '8px',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: '0 4px 12px rgba(255, 90, 31, 0.35)'
+                    }}
+                  >
+                    <span>+</span> {currentLang === 'bn' ? 'নতুন পণ্য পোস্ট করুন' : 'Post New Product'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Filters & Search Row */}
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '18px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ flex: 1, minWidth: '220px', position: 'relative' }}>
+                  <input
+                    type="text"
+                    placeholder={currentLang === 'bn' ? 'পণ্যের নাম বা SKU দিয়ে খুঁজুন...' : 'Search product title or SKU...'}
+                    value={productSearch}
+                    onChange={e => setProductSearch(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      borderRadius: '8px',
+                      border: '1px solid #CBD5E1',
+                      fontSize: '13px',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                <select
+                  value={selectedCategoryFilter}
+                  onChange={e => setSelectedCategoryFilter(e.target.value)}
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    fontSize: '13px',
+                    background: '#fff',
+                    outline: 'none',
+                    fontWeight: 600,
+                    color: '#334155'
+                  }}
+                >
+                  <option value="All">All Categories</option>
+                  {categoriesList.map(c => (
+                    <option key={c} value={c}>{c}</option>
                   ))}
-                </tbody>
-              </table>
+                </select>
+
+                <select
+                  value={selectedStatusFilter}
+                  onChange={e => setSelectedStatusFilter(e.target.value)}
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    fontSize: '13px',
+                    background: '#fff',
+                    outline: 'none',
+                    fontWeight: 600,
+                    color: '#334155'
+                  }}
+                >
+                  <option value="All">All Status</option>
+                  <option value="in_stock">In Stock (10+)</option>
+                  <option value="low_stock">Low Stock (1-10)</option>
+                  <option value="out_of_stock">Out of Stock (0)</option>
+                </select>
+              </div>
+
+              {/* Products Table */}
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+                  <thead>
+                    <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', color: '#475569' }}>
+                      <th style={{ padding: '12px 14px' }}>Product</th>
+                      <th style={{ padding: '12px 14px' }}>Category</th>
+                      <th style={{ padding: '12px 14px' }}>Unit Price (BDT)</th>
+                      <th style={{ padding: '12px 14px' }}>Available Stock & MOQ</th>
+                      <th style={{ padding: '12px 14px' }}>Listing Status</th>
+                      <th style={{ padding: '12px 14px', textAlign: 'center' }}>Live Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products
+                      .filter(p => {
+                        const matchesSearch = !productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.id.toLowerCase().includes(productSearch.toLowerCase());
+                        const matchesCategory = selectedCategoryFilter === 'All' || p.category === selectedCategoryFilter;
+                        const matchesStatus = selectedStatusFilter === 'All' || p.status === selectedStatusFilter;
+                        return matchesSearch && matchesCategory && matchesStatus;
+                      })
+                      .map(p => {
+                        const thumb = p.imagePath || (p.images && p.images[0]) || '/uploads/default.jpg';
+                        return (
+                          <tr key={p.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                            <td style={{ padding: '14px 14px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <img
+                                  src={thumb}
+                                  alt={p.name}
+                                  onError={(e: any) => { e.target.src = 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=100&auto=format&fit=crop&q=60'; }}
+                                  style={{
+                                    width: '48px',
+                                    height: '48px',
+                                    borderRadius: '8px',
+                                    objectFit: 'cover',
+                                    border: '1px solid #E2E8F0',
+                                    background: '#F8FAFC'
+                                  }}
+                                />
+                                <div>
+                                  <div style={{ fontWeight: 800, color: '#0F172A', fontSize: '14px', maxWidth: '300px', lineHeight: '1.4' }}>
+                                    {p.name}
+                                  </div>
+                                  <div style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 600, marginTop: '2px' }}>
+                                    SKU: <span style={{ color: '#64748B' }}>{p.id}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+
+                            <td style={{ padding: '14px 14px' }}>
+                              <span style={{ background: '#F1F5F9', color: '#334155', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 700 }}>
+                                {p.category}
+                              </span>
+                            </td>
+
+                            <td style={{ padding: '14px 14px' }}>
+                              <div style={{ fontWeight: 800, color: '#FF5A1F', fontSize: '15px' }}>
+                                ৳ {p.unitPrice.toFixed(2)}
+                              </div>
+                              {p.originalPrice && p.originalPrice > p.unitPrice && (
+                                <div style={{ fontSize: '11px', color: '#94A3B8', textDecoration: 'line-through', fontWeight: 600 }}>
+                                  ৳ {p.originalPrice.toFixed(2)}
+                                </div>
+                              )}
+                            </td>
+
+                            <td style={{ padding: '14px 14px' }}>
+                              <div style={{ fontWeight: 800, color: p.stock <= 10 ? '#DC2626' : '#0F172A', fontSize: '14px' }}>
+                                {p.stock.toLocaleString()} {p.unit || 'pcs'}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600, marginTop: '2px' }}>
+                                MOQ: {p.moq || 1} {p.unit || 'pcs'}
+                              </div>
+                            </td>
+
+                            <td style={{ padding: '14px 14px' }}>
+                              <span style={{
+                                padding: '4px 10px',
+                                borderRadius: '12px',
+                                fontSize: '12px',
+                                fontWeight: 800,
+                                background: p.stock > 10 ? '#DEF7EC' : (p.stock > 0 ? '#FEF08A' : '#FDE8E8'),
+                                color: p.stock > 10 ? '#03543F' : (p.stock > 0 ? '#854D0E' : '#9B1C1C'),
+                                display: 'inline-block'
+                              }}>
+                                {p.stock > 10 ? '● In Stock' : (p.stock > 0 ? '▲ Low Stock' : '✕ Out of Stock')}
+                              </span>
+                            </td>
+
+                            <td style={{ padding: '14px 14px' }}>
+                              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                                <button
+                                  onClick={() => window.open(`${storeApiUrl}/product/${p.id}`, '_blank')}
+                                  title="View Live on PackBang Storefront"
+                                  style={{
+                                    background: '#F0FDF4',
+                                    color: '#15803D',
+                                    border: '1px solid #BBF7D0',
+                                    borderRadius: '6px',
+                                    padding: '6px 10px',
+                                    cursor: 'pointer',
+                                    fontWeight: 700,
+                                    fontSize: '12px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  🌐 View Live
+                                </button>
+
+                                <button
+                                  onClick={() => setEditingProduct(p)}
+                                  title="Edit Product"
+                                  style={{
+                                    background: '#EFF6FF',
+                                    color: '#1D4ED8',
+                                    border: '1px solid #BFDBFE',
+                                    borderRadius: '6px',
+                                    padding: '6px 10px',
+                                    cursor: 'pointer',
+                                    fontWeight: 700,
+                                    fontSize: '12px'
+                                  }}
+                                >
+                                  ✏️ Edit
+                                </button>
+
+                                <button
+                                  onClick={() => handleDeleteProduct(p.id)}
+                                  title="Delete Product"
+                                  style={{
+                                    background: '#FEF2F2',
+                                    color: '#DC2626',
+                                    border: '1px solid #FECACA',
+                                    borderRadius: '6px',
+                                    padding: '6px 10px',
+                                    cursor: 'pointer',
+                                    fontWeight: 700,
+                                    fontSize: '12px'
+                                  }}
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
@@ -1024,88 +1451,259 @@ export default function SellerDashboard({
           left: 0,
           width: '100%',
           height: '100%',
-          background: 'rgba(0,0,0,0.5)',
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 9999
+          zIndex: 9999,
+          padding: '20px'
         }}>
           <div style={{
             background: '#FFFFFF',
             borderRadius: '16px',
             padding: '28px',
-            width: '90%',
-            maxWidth: '480px',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
+            width: '100%',
+            maxWidth: '620px',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
           }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 800 }}>Add Packaging Product</h3>
-            <form onSubmit={handleAddProduct} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #F1F5F9', paddingBottom: '14px' }}>
               <div>
-                <label style={{ fontSize: '13px', fontWeight: 700 }}>Item Name</label>
+                <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#0F172A' }}>
+                  📦 {currentLang === 'bn' ? 'প্যাকেজিং পণ্য ক্যাটালগে যুক্ত করুন' : 'Post Product to PackBang Marketplace'}
+                </h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748B' }}>
+                  {currentLang === 'bn' ? 'পণ্য পোস্ট করার সাথে সাথে packbang.com এর লাইভ স্টোরে যুক্ত হবে।' : 'Instantly published to packbang.com catalog with factory verified badge.'}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAddModal(false)}
+                style={{ background: 'none', border: 'none', fontSize: '22px', cursor: 'pointer', color: '#94A3B8' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAddProduct} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                  Product Title / Name *
+                </label>
                 <input
                   type="text"
-                  placeholder="e.g. 5-Ply Corrugated Box (12x10x6)"
+                  placeholder="e.g. 5-Ply Heavy Duty Corrugated Carton Box (12x10x8 inch)"
                   required
                   value={newProductName}
                   onChange={e => setNewProductName(e.target.value)}
-                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1' }}
+                  style={{ width: '100%', padding: '11px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px', outline: 'none' }}
                 />
               </div>
 
-              <div>
-                <label style={{ fontSize: '13px', fontWeight: 700 }}>Category</label>
-                <select
-                  value={newCategory}
-                  onChange={e => setNewCategory(e.target.value)}
-                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1' }}
-                >
-                  <option value="Courier Poly">Courier Poly</option>
-                  <option value="Bubble Wrap">Bubble Wrap</option>
-                  <option value="Carton Boxes">Carton Boxes</option>
-                  <option value="Stickers & Tape">Stickers & Tape</option>
-                  <option value="Gift Packets">Gift Packets</option>
-                </select>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                    Category *
+                  </label>
+                  <select
+                    value={newCategory}
+                    onChange={e => setNewCategory(e.target.value)}
+                    style={{ width: '100%', padding: '11px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px', background: '#fff', outline: 'none' }}
+                  >
+                    {categoriesList.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                    Packaging Unit
+                  </label>
+                  <select
+                    value={newUnit}
+                    onChange={e => setNewUnit(e.target.value)}
+                    style={{ width: '100%', padding: '11px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px', background: '#fff', outline: 'none' }}
+                  >
+                    <option value="pcs">Pieces (pcs)</option>
+                    <option value="packet">Packet (100 pcs)</option>
+                    <option value="roll">Roll / Bundle</option>
+                    <option value="box">Box / Carton</option>
+                    <option value="kg">Kilogram (kg)</option>
+                  </select>
+                </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '13px', fontWeight: 700 }}>Unit Price (৳)</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                    Offer Price (BDT) *
+                  </label>
                   <input
                     type="number"
-                    step="0.1"
-                    placeholder="e.g. 8.5"
+                    step="0.01"
+                    placeholder="e.g. 18.50"
                     required
                     value={newPrice}
                     onChange={e => setNewPrice(e.target.value)}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1' }}
+                    style={{ width: '100%', padding: '11px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px', outline: 'none' }}
                   />
                 </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '13px', fontWeight: 700 }}>Stock Qty</label>
+
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                    Regular Strikethrough Price (Optional)
+                  </label>
                   <input
                     type="number"
-                    placeholder="e.g. 5000"
-                    required
-                    value={newStock}
-                    onChange={e => setNewStock(e.target.value)}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1' }}
+                    step="0.01"
+                    placeholder="e.g. 24.00"
+                    value={newOriginalPrice}
+                    onChange={e => setNewOriginalPrice(e.target.value)}
+                    style={{ width: '100%', padding: '11px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px', outline: 'none' }}
                   />
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                    Available Factory Stock *
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 15000"
+                    required
+                    value={newStock}
+                    onChange={e => setNewStock(e.target.value)}
+                    style={{ width: '100%', padding: '11px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px', outline: 'none' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                    Minimum Order Qty (MOQ)
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 50"
+                    value={newMoq}
+                    onChange={e => setNewMoq(e.target.value)}
+                    style={{ width: '100%', padding: '11px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px', outline: 'none' }}
+                  />
+                </div>
+              </div>
+
+              {/* Product Images Upload & URL */}
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                  Product Images (Upload or Add URL)
+                </label>
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                  <label style={{
+                    background: '#F1F5F9',
+                    border: '1px dashed #94A3B8',
+                    borderRadius: '8px',
+                    padding: '8px 14px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    color: '#334155',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    📁 {isUploadingImage ? 'Uploading...' : 'Upload Image File'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleImageFileUpload}
+                      style={{ display: 'none' }}
+                      disabled={isUploadingImage}
+                    />
+                  </label>
+
+                  <div style={{ display: 'flex', flex: 1, gap: '6px' }}>
+                    <input
+                      type="text"
+                      placeholder="Or paste image URL (https://...)"
+                      value={imageInputVal}
+                      onChange={e => setImageInputVal(e.target.value)}
+                      style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', outline: 'none' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (imageInputVal.trim()) {
+                          setNewImageUrls(prev => [...prev, imageInputVal.trim()]);
+                          setImageInputVal('');
+                        }
+                      }}
+                      style={{ background: '#334155', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      + Add URL
+                    </button>
+                  </div>
+                </div>
+
+                {/* Previews */}
+                {newImageUrls.length > 0 && (
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', padding: '10px', background: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                    {newImageUrls.map((url, idx) => (
+                      <div key={idx} style={{ position: 'relative', width: '60px', height: '60px' }}>
+                        <img src={url} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px', border: '1px solid #CBD5E1' }} />
+                        <button
+                          type="button"
+                          onClick={() => setNewImageUrls(prev => prev.filter((_, i) => i !== idx))}
+                          style={{ position: 'absolute', top: -5, right: -5, width: '18px', height: '18px', borderRadius: '50%', background: '#DC2626', color: '#fff', border: 'none', fontSize: '10px', fontWeight: 800, cursor: 'pointer' }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Description */}
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '6px' }}>
+                  Product Description & Specifications
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Provide materials, ply rating, flute type, GSM, dimensions, and wholesale delivery terms..."
+                  value={newDescription}
+                  onChange={e => setNewDescription(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', outline: 'none', resize: 'vertical' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '10px', paddingTop: '14px', borderTop: '1px solid #F1F5F9' }}>
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#fff', cursor: 'pointer', fontWeight: 700 }}
+                  style={{ padding: '10px 18px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#fff', cursor: 'pointer', fontWeight: 700, color: '#64748B' }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', background: '#FF5A1F', color: '#fff', cursor: 'pointer', fontWeight: 700 }}
+                  disabled={isSubmittingProduct}
+                  style={{
+                    padding: '10px 24px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #FF5A1F, #E64A19)',
+                    color: '#fff',
+                    cursor: isSubmittingProduct ? 'not-allowed' : 'pointer',
+                    fontWeight: 700,
+                    boxShadow: '0 4px 12px rgba(255, 90, 31, 0.35)'
+                  }}
                 >
-                  Add Product
+                  {isSubmittingProduct ? 'Publishing...' : 'Publish to Marketplace 🚀'}
                 </button>
               </div>
             </form>
@@ -1113,9 +1711,8 @@ export default function SellerDashboard({
         </div>
       )}
 
-      {/* Modal: Submit Bid */}
-      {/* SELLER SAFE CHAT MODAL */}
-      {sellerChatModalItem && (
+      {/* EDIT PRODUCT MODAL */}
+      {editingProduct && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -1127,53 +1724,248 @@ export default function SellerDashboard({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 99999,
-          padding: '16px'
+          zIndex: 9999,
+          padding: '20px'
         }}>
           <div style={{
             background: '#FFFFFF',
             borderRadius: '16px',
+            padding: '28px',
             width: '100%',
-            maxWidth: '540px',
-            boxShadow: '0 25px 60px rgba(0,0,0,0.25)',
-            display: 'flex',
-            flexDirection: 'column',
-            maxHeight: '90vh',
-            overflow: 'hidden'
+            maxWidth: '560px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
           }}>
-            {/* Header */}
-            <div style={{ padding: '16px 20px', background: '#0F172A', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 800 }}>Chat with {sellerChatModalItem.buyer}</h4>
-                <span style={{ fontSize: '12px', color: '#94A3B8' }}>Request #{sellerChatModalItem.id}</span>
-              </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #F1F5F9', paddingBottom: '12px' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#0F172A' }}>
+                ✏️ Edit Product ({editingProduct.id})
+              </h3>
               <button
-                type="button"
-                onClick={() => setSellerChatModalItem(null)}
-                style={{ background: 'none', border: 'none', color: '#94A3B8', fontSize: '22px', cursor: 'pointer' }}
+                onClick={() => setEditingProduct(null)}
+                style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#94A3B8' }}
               >
-                &times;
+                ✕
               </button>
             </div>
 
-            {/* Warning Shield */}
-            <div style={{ background: '#FFFBEB', borderBottom: '1px solid #FEF3C7', padding: '10px 16px', fontSize: '12px', color: '#92400E', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-              <span>🛡️</span>
+            <form onSubmit={handleUpdateProduct} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
-                <strong>Safe Messaging Policy</strong>
-                <p style={{ margin: 0, lineHeight: 1.3 }}>Direct sharing of phone numbers, emails, WhatsApp, or offline payments is strictly prohibited.</p>
+                <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '4px' }}>
+                  Product Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editingProduct.name}
+                  onChange={e => setEditingProduct({ ...editingProduct, name: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px' }}
+                />
               </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '4px' }}>
+                    Unit Price (BDT)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={editingProduct.unitPrice}
+                    onChange={e => setEditingProduct({ ...editingProduct, unitPrice: parseFloat(e.target.value) || 0 })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '4px' }}>
+                    Stock Available
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={editingProduct.stock}
+                    onChange={e => setEditingProduct({ ...editingProduct, stock: parseInt(e.target.value) || 0 })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '4px' }}>
+                    Category
+                  </label>
+                  <select
+                    value={editingProduct.category}
+                    onChange={e => setEditingProduct({ ...editingProduct, category: e.target.value })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px', background: '#fff' }}
+                  >
+                    {categoriesList.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '4px' }}>
+                    MOQ
+                  </label>
+                  <input
+                    type="number"
+                    value={editingProduct.moq || 1}
+                    onChange={e => setEditingProduct({ ...editingProduct, moq: parseInt(e.target.value) || 1 })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '4px' }}>
+                  Description
+                </label>
+                <textarea
+                  rows={3}
+                  value={editingProduct.description || ''}
+                  onChange={e => setEditingProduct({ ...editingProduct, description: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px', paddingTop: '12px', borderTop: '1px solid #F1F5F9' }}>
+                <button
+                  type="button"
+                  onClick={() => setEditingProduct(null)}
+                  style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#fff', cursor: 'pointer', fontWeight: 700 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingProduct}
+                  style={{ padding: '8px 20px', borderRadius: '8px', border: 'none', background: '#FF5A1F', color: '#fff', cursor: 'pointer', fontWeight: 700 }}
+                >
+                  {isSubmittingProduct ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+{bidModalItem && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '16px',
+            padding: '28px',
+            width: '90%',
+            maxWidth: '460px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
+          }}>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: 800 }}>Submit Wholesale Quotation</h3>
+            <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#64748B' }}>
+              Buyer: <strong>{bidModalItem.buyer}</strong> ({bidModalItem.quantity.toLocaleString()} pcs)
+            </p>
+
+            <form onSubmit={handlePlaceBid}>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>
+                  Your Factory Price Per Unit (৳)
+                </label>
+                <input
+                  type="number"
+                  step="0.05"
+                  required
+                  placeholder="e.g. 4.10"
+                  value={bidAmount}
+                  onChange={e => setBidAmount(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '16px' }}
+                />
+                <span style={{ fontSize: '12px', color: '#059669', display: 'block', marginTop: '4px' }}>
+                  Target Budget: {bidModalItem.targetBudget}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setBidModalItem(null)}
+                  style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#fff', cursor: 'pointer', fontWeight: 700 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingBid}
+                  style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', background: '#FF5A1F', color: '#fff', cursor: 'pointer', fontWeight: 700, opacity: isSubmittingBid ? 0.7 : 1 }}
+                >
+                  {isSubmittingBid ? 'Submitting...' : 'Submit Quote'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+    
+      {/* Seller Chat Modal */}
+      {sellerChatModalItem && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999
+        }}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '16px',
+            width: '95%',
+            maxWidth: '520px',
+            display: 'flex',
+            flexDirection: 'column',
+            maxHeight: '85vh',
+            overflow: 'hidden',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
+          }}>
+            {/* Header */}
+            <div style={{ background: '#0F172A', color: '#fff', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 800 }}>Chat with Buyer ({sellerChatModalItem.buyer})</h4>
+                <div style={{ fontSize: '11px', color: '#94A3B8' }}>Inquiry: {sellerChatModalItem.id}</div>
+              </div>
+              <button
+                onClick={() => setSellerChatModalItem(null)}
+                style={{ background: 'none', border: 'none', color: '#fff', fontSize: '18px', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
             </div>
 
-            {/* Messages */}
-            <div style={{ flex: '1 1 auto', overflowY: 'auto', padding: '16px 20px', background: '#F8FAFC', display: 'flex', flexDirection: 'column', gap: '10px', minHeight: '240px', maxHeight: '340px' }}>
+            {/* Message Body */}
+            <div style={{ flex: 1, padding: '16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', background: '#F8FAFC' }}>
               {isLoadingMessages ? (
-                <div style={{ textAlign: 'center', color: '#94A3B8', margin: 'auto' }}>Loading messages...</div>
+                <div style={{ textAlign: 'center', color: '#64748B', fontSize: '13px', padding: '20px' }}>Loading conversation...</div>
               ) : sellerChatMessages.length === 0 ? (
-                <div style={{ textAlign: 'center', color: '#94A3B8', margin: 'auto' }}>No messages yet. Greet the customer and clarify requirements.</div>
+                <div style={{ textAlign: 'center', color: '#64748B', fontSize: '13px', padding: '20px' }}>No messages yet. Send an inquiry regarding sample specs or delivery schedule.</div>
               ) : (
                 sellerChatMessages.map((m, idx) => {
-                  const isMe = m.senderRole === 'seller';
+                  const isMe = m.sellerId === seller.id || m.senderRole === 'seller';
                   const isSys = m.senderId === 'SYSTEM';
                   if (isSys) {
                     return (
@@ -1255,72 +2047,6 @@ export default function SellerDashboard({
         </div>
       )}
 
-      {bidModalItem && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999
-        }}>
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: '16px',
-            padding: '28px',
-            width: '90%',
-            maxWidth: '460px',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
-          }}>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: 800 }}>Submit Wholesale Quotation</h3>
-            <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#64748B' }}>
-              Buyer: <strong>{bidModalItem.buyer}</strong> ({bidModalItem.quantity.toLocaleString()} pcs)
-            </p>
-
-            <form onSubmit={handlePlaceBid}>
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>
-                  Your Factory Price Per Unit (৳)
-                </label>
-                <input
-                  type="number"
-                  step="0.05"
-                  required
-                  placeholder="e.g. 4.10"
-                  value={bidAmount}
-                  onChange={e => setBidAmount(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '16px' }}
-                />
-                <span style={{ fontSize: '12px', color: '#059669', display: 'block', marginTop: '4px' }}>
-                  Target Budget: {bidModalItem.targetBudget}
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <button
-                  type="button"
-                  onClick={() => setBidModalItem(null)}
-                  style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#fff', cursor: 'pointer', fontWeight: 700 }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmittingBid}
-                  style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', background: '#FF5A1F', color: '#fff', cursor: 'pointer', fontWeight: 700, opacity: isSubmittingBid ? 0.7 : 1 }}
-                >
-                  {isSubmittingBid ? 'Submitting...' : 'Submit Quote'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-    </div>
+</div>
   );
 }
