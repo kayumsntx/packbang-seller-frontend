@@ -6,6 +6,26 @@ export interface SellerProfile {
   shopName: string;
   email?: string;
   tier?: string;
+  ownerName?: string;
+  tradeLicenseNumber?: string;
+  tradeLicenseImage?: string;
+  nidNumber?: string;
+  nidFrontImage?: string;
+  nidBackImage?: string;
+  kycStatus?: 'unverified' | 'pending_verification' | 'verified' | 'rejected';
+  kycSubmittedAt?: string;
+  bankDetails?: {
+    bankName?: string;
+    accountNumber?: string;
+    accountHolderName?: string;
+    branchName?: string;
+    bkashNumber?: string;
+  };
+  warehouseAddress?: {
+    division?: string;
+    city?: string;
+    fullAddress?: string;
+  };
 }
 
 interface SellerDashboardProps {
@@ -14,6 +34,7 @@ interface SellerDashboardProps {
   onLogout: () => void;
   onGoLanding: () => void;
   onLangChange: (lang: 'en' | 'bn') => void;
+  onSellerUpdate?: (updated: SellerProfile) => void;
 }
 
 interface ProductItem {
@@ -59,8 +80,13 @@ export default function SellerDashboard({
   currentLang,
   onLogout,
   onGoLanding,
-  onLangChange
+  onLangChange,
+  onSellerUpdate
 }: SellerDashboardProps) {
+  const [currentSeller, setCurrentSeller] = useState<SellerProfile>(seller);
+  useEffect(() => {
+    setCurrentSeller(seller);
+  }, [seller]);
   const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'bids' | 'settings'>('overview');
   const [showAddModal, setShowAddModal] = useState(false);
   const [bidModalItem, setBidModalItem] = useState<CustomBidRequest | null>(null);
@@ -75,10 +101,54 @@ export default function SellerDashboard({
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
-  // Store API base URL for live bidding sync
+  // Store API base URL for live marketplace sync
   const storeApiUrl = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
     ? 'http://localhost:8000'
     : 'https://packbang.com';
+
+  const sellerBackendApiUrl = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+    ? 'http://localhost:5000'
+    : 'https://packbang-seller-backend.onrender.com';
+
+  // Profile & Verification (KYC) state
+  const [profileShopName, setProfileShopName] = useState(currentSeller.shopName || '');
+  const [profileOwnerName, setProfileOwnerName] = useState(currentSeller.ownerName || '');
+  const [profileEmail, setProfileEmail] = useState(currentSeller.email || '');
+  const [profileTradeLicenseNumber, setProfileTradeLicenseNumber] = useState(currentSeller.tradeLicenseNumber || '');
+  const [profileTradeLicenseImage, setProfileTradeLicenseImage] = useState(currentSeller.tradeLicenseImage || '');
+  const [profileNidNumber, setProfileNidNumber] = useState(currentSeller.nidNumber || '');
+  const [profileNidFrontImage, setProfileNidFrontImage] = useState(currentSeller.nidFrontImage || '');
+  const [profileNidBackImage, setProfileNidBackImage] = useState(currentSeller.nidBackImage || '');
+  const [profileAddress, setProfileAddress] = useState(currentSeller.warehouseAddress?.fullAddress || '');
+  const [profileDivision, setProfileDivision] = useState(currentSeller.warehouseAddress?.division || 'Dhaka');
+  const [profileCity, setProfileCity] = useState(currentSeller.warehouseAddress?.city || 'Dhaka');
+  const [profileBankName, setProfileBankName] = useState(currentSeller.bankDetails?.bankName || '');
+  const [profileAccountNumber, setProfileAccountNumber] = useState(currentSeller.bankDetails?.accountNumber || '');
+  const [profileAccountHolderName, setProfileAccountHolderName] = useState(currentSeller.bankDetails?.accountHolderName || '');
+  const [profileBranchName, setProfileBranchName] = useState(currentSeller.bankDetails?.branchName || '');
+  const [profileBkashNumber, setProfileBkashNumber] = useState(currentSeller.bankDetails?.bkashNumber || '');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [uploadingDocType, setUploadingDocType] = useState<'tradeLicense' | 'nidFront' | 'nidBack' | null>(null);
+
+  // Sync profile form state when currentSeller updates
+  useEffect(() => {
+    setProfileShopName(currentSeller.shopName || '');
+    setProfileOwnerName(currentSeller.ownerName || '');
+    setProfileEmail(currentSeller.email || '');
+    setProfileTradeLicenseNumber(currentSeller.tradeLicenseNumber || '');
+    setProfileTradeLicenseImage(currentSeller.tradeLicenseImage || '');
+    setProfileNidNumber(currentSeller.nidNumber || '');
+    setProfileNidFrontImage(currentSeller.nidFrontImage || '');
+    setProfileNidBackImage(currentSeller.nidBackImage || '');
+    setProfileAddress(currentSeller.warehouseAddress?.fullAddress || '');
+    setProfileDivision(currentSeller.warehouseAddress?.division || 'Dhaka');
+    setProfileCity(currentSeller.warehouseAddress?.city || 'Dhaka');
+    setProfileBankName(currentSeller.bankDetails?.bankName || '');
+    setProfileAccountNumber(currentSeller.bankDetails?.accountNumber || '');
+    setProfileAccountHolderName(currentSeller.bankDetails?.accountHolderName || '');
+    setProfileBranchName(currentSeller.bankDetails?.branchName || '');
+    setProfileBkashNumber(currentSeller.bankDetails?.bkashNumber || '');
+  }, [currentSeller]);
 
   const fetchApprovedOrders = async () => {
     setIsLoadingBids(true);
@@ -89,7 +159,7 @@ export default function SellerDashboard({
       if (data.success && Array.isArray(data.orders) && data.orders.length > 0) {
         const liveOrders: CustomBidRequest[] = data.orders.map((o: any) => {
           const existingBid = o.bids?.find(
-            (b: any) => b.sellerId === seller.id || b.sellerName === seller.shopName
+            (b: any) => b.sellerId === currentSeller.id || b.sellerName === currentSeller.shopName
           );
           return {
             id: o.id,
@@ -116,10 +186,10 @@ export default function SellerDashboard({
   const fetchSellerProducts = async () => {
     setIsLoadingProducts(true);
     try {
-      const res = await fetch(`${storeApiUrl}/api/seller/products?sellerId=${encodeURIComponent(seller.id)}&sellerPhone=${encodeURIComponent(seller.phone)}`);
+      const res = await fetch(`${storeApiUrl}/api/seller/products?sellerId=${encodeURIComponent(currentSeller.id)}&sellerPhone=${encodeURIComponent(currentSeller.phone)}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.success && Array.isArray(data.products) && data.products.length > 0) {
+        if (data.success && Array.isArray(data.products)) {
           const mapped: ProductItem[] = data.products.map((p: any) => ({
             id: p.id,
             name: p.name,
@@ -145,6 +215,43 @@ export default function SellerDashboard({
     }
   };
 
+  const fetchSellerOrders = async () => {
+    setIsLoadingOrders(true);
+    try {
+      const res = await fetch(`${storeApiUrl}/api/seller/orders?sellerId=${encodeURIComponent(currentSeller.id)}&sellerPhone=${encodeURIComponent(currentSeller.phone)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.orders)) {
+          setOrders(data.orders);
+        }
+      }
+    } catch (err) {
+      console.warn('Live seller orders sync warning:', err);
+    } finally {
+      setIsLoadingOrders(false);
+    }
+  };
+
+  const fetchSellerMetrics = async () => {
+    try {
+      const res = await fetch(`${storeApiUrl}/api/seller/metrics?sellerId=${encodeURIComponent(currentSeller.id)}&sellerPhone=${encodeURIComponent(currentSeller.phone)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setSellerMetrics({
+            totalStock: data.totalStock || 0,
+            totalListings: data.totalListings || 0,
+            totalRevenue: data.totalRevenue || 0,
+            activeShipments: data.activeShipments || 0,
+            bidsPlaced: data.bidsPlaced || 0
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Live seller metrics sync warning:', err);
+    }
+  };
+
   const fetchCategories = async () => {
     try {
       const res = await fetch(`${storeApiUrl}/api/seller/categories`);
@@ -161,8 +268,10 @@ export default function SellerDashboard({
   useEffect(() => {
     fetchApprovedOrders();
     fetchSellerProducts();
+    fetchSellerOrders();
+    fetchSellerMetrics();
     fetchCategories();
-  }, [activeTab, seller.id]);
+  }, [activeTab, currentSeller.id, currentSeller.phone]);
 
   // Live Marketplace Products Integration
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
@@ -191,85 +300,19 @@ export default function SellerDashboard({
   const [imageInputVal, setImageInputVal] = useState('');
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
-  // Initial Packaging Inventory
-  const [products, setProducts] = useState<ProductItem[]>([
-    {
-      id: 'PK-101',
-      name: 'Black Courier Poly Mailers (10" x 14" with POD Pocket)',
-      category: 'Courier Poly',
-      unitPrice: 4.80,
-      stock: 18500,
-      moq: 100,
-      status: 'in_stock'
-    },
-    {
-      id: 'PK-102',
-      name: '2-Layer Premium Air Bubble Wrap Roll (100m x 1.2m)',
-      category: 'Bubble Wrap',
-      unitPrice: 1450.00,
-      stock: 64,
-      moq: 1,
-      status: 'in_stock'
-    },
-    {
-      id: 'PK-103',
-      name: '3-Ply Corrugated Shipping Carton (8" x 6" x 4")',
-      category: 'Carton Boxes',
-      unitPrice: 16.50,
-      stock: 3200,
-      moq: 50,
-      status: 'in_stock'
-    },
-    {
-      id: 'PK-104',
-      name: 'Custom Branded Security Fragile Tape (2 Inch x 65M)',
-      category: 'Stickers & Tape',
-      unitPrice: 85.00,
-      stock: 12,
-      moq: 6,
-      status: 'low_stock'
-    },
-    {
-      id: 'PK-105',
-      name: 'Kraft Paper Boutique Gift Shopping Bags (Medium)',
-      category: 'Gift Packets',
-      unitPrice: 22.00,
-      stock: 2400,
-      moq: 50,
-      status: 'in_stock'
-    }
-  ]);
+  // Individual Seller Packaging Inventory (Isolated to logged-in supplier)
+  const [products, setProducts] = useState<ProductItem[]>([]);
 
-  // Initial Orders
-  const [orders] = useState<OrderItem[]>([// setOrders reserved
-    {
-      orderId: 'ORD-8924',
-      buyerShop: 'Aarong Crafts Partner',
-      items: '1,000x Courier Poly 10x14',
-      amount: 4800,
-      date: 'Today, 01:20 PM',
-      status: 'Processing',
-      courier: 'Steadfast Courier'
-    },
-    {
-      orderId: 'ORD-8919',
-      buyerShop: 'Dhaka Gadget Store',
-      items: '2x Bubble Wrap 100M Roll',
-      amount: 2900,
-      date: 'Yesterday',
-      status: 'Shipped',
-      courier: 'Steadfast Courier'
-    },
-    {
-      orderId: 'ORD-8904',
-      buyerShop: 'Chaldal Merchant Supply',
-      items: '500x 3-Ply Cartons',
-      amount: 8250,
-      date: '12 Oct 2026',
-      status: 'Delivered',
-      courier: 'RedX Logistics'
-    }
-  ]);
+  // Individual Seller Orders (Isolated to logged-in supplier)
+  const [orders, setOrders] = useState<OrderItem[]>([]);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(false);
+  const [sellerMetrics, setSellerMetrics] = useState({
+    totalStock: 0,
+    totalListings: 0,
+    totalRevenue: 0,
+    activeShipments: 0,
+    bidsPlaced: 0
+  });
 
   // Wholesale Custom Bids from Dhaka Stores
   const [bids, setBids] = useState<CustomBidRequest[]>([
@@ -312,6 +355,129 @@ export default function SellerDashboard({
     setTimeout(() => setNotification(null), 3500);
   };
 
+  const handleDocFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, docType: 'tradeLicense' | 'nidFront' | 'nidBack') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingDocType(docType);
+    try {
+      const formData = new FormData();
+      formData.append('productImages', file);
+      const res = await fetch(`${storeApiUrl}/api/seller/products/upload-image`, {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.urls) && data.urls.length > 0) {
+        const uploadedUrl = data.urls[0];
+        if (docType === 'tradeLicense') {
+          setProfileTradeLicenseImage(uploadedUrl);
+          showToast(currentLang === 'bn' ? 'ট্রেড লাইসেন্স ডকুমেন্ট আপলোড হয়েছে' : 'Trade License uploaded successfully');
+        } else if (docType === 'nidFront') {
+          setProfileNidFrontImage(uploadedUrl);
+          showToast(currentLang === 'bn' ? 'এনআইডি সামনের অংশ আপলোড হয়েছে' : 'NID front part uploaded successfully');
+        } else if (docType === 'nidBack') {
+          setProfileNidBackImage(uploadedUrl);
+          showToast(currentLang === 'bn' ? 'এনআইডি পেছনের অংশ আপলোড হয়েছে' : 'NID back part uploaded successfully');
+        }
+      } else {
+        showToast(currentLang === 'bn' ? 'ডকুমেন্ট আপলোড ব্যর্থ হয়েছে' : 'Document upload failed');
+      }
+    } catch (err) {
+      console.error('Doc upload error:', err);
+      showToast(currentLang === 'bn' ? 'আপলোড সংযোগ ত্রুটি' : 'Document upload network error');
+    } finally {
+      setUploadingDocType(null);
+      e.target.value = '';
+    }
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profileOwnerName.trim()) {
+      showToast(currentLang === 'bn' ? 'অনুগ্রহ করে সেলারের নাম (মালিকের নাম) দিন' : 'Seller Legal Name is required');
+      return;
+    }
+
+    setIsSavingProfile(true);
+    try {
+      const token = localStorage.getItem('packbang_seller_token');
+      const payload = {
+        shopName: profileShopName.trim() || currentSeller.shopName,
+        ownerName: profileOwnerName.trim(),
+        email: profileEmail.trim(),
+        warehouseAddress: {
+          division: profileDivision,
+          city: profileCity,
+          fullAddress: profileAddress
+        },
+        tradeLicenseNumber: profileTradeLicenseNumber.trim(),
+        tradeLicenseImage: profileTradeLicenseImage,
+        nidNumber: profileNidNumber.trim(),
+        nidFrontImage: profileNidFrontImage,
+        nidBackImage: profileNidBackImage,
+        bankDetails: {
+          bankName: profileBankName.trim(),
+          accountNumber: profileAccountNumber.trim(),
+          accountHolderName: profileAccountHolderName.trim(),
+          branchName: profileBranchName.trim(),
+          bkashNumber: profileBkashNumber.trim()
+        }
+      };
+
+      let updatedDoc: any = null;
+      try {
+        const res = await fetch(`${sellerBackendApiUrl}/api/auth/profile`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.seller) {
+            updatedDoc = data.seller;
+          }
+        }
+      } catch (backendErr) {
+        console.warn('Backend sync notice:', backendErr);
+      }
+
+      const hasRequiredDocs = !!(
+        payload.ownerName &&
+        (payload.tradeLicenseNumber || payload.tradeLicenseImage) &&
+        payload.nidFrontImage &&
+        payload.nidBackImage
+      );
+
+      const mergedSeller: SellerProfile = {
+        ...currentSeller,
+        ...payload,
+        ...(updatedDoc || {}),
+        kycStatus: hasRequiredDocs
+          ? (currentSeller.kycStatus === 'verified' ? 'verified' : 'pending_verification')
+          : 'unverified'
+      };
+
+      setCurrentSeller(mergedSeller);
+      localStorage.setItem('packbang_seller_user', JSON.stringify(mergedSeller));
+      if (onSellerUpdate) onSellerUpdate(mergedSeller);
+
+      showToast(
+        currentLang === 'bn'
+          ? 'প্রোফাইল ও ভেরিফিকেশন তথ্য সংরক্ষিত হয়েছে!'
+          : 'Profile and verification documents saved successfully!'
+      );
+    } catch (err: any) {
+      console.error('Save profile error:', err);
+      showToast(err.message || 'Error updating profile');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProductName.trim() || !newPrice || !newStock) {
@@ -331,9 +497,9 @@ export default function SellerDashboard({
         unit: newUnit,
         description: newDescription.trim(),
         images: newImageUrls.length > 0 ? newImageUrls : ['https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=600&auto=format&fit=crop&q=80'],
-        sellerId: seller.id,
-        sellerName: seller.shopName || 'PackBang Verified Factory',
-        sellerPhone: seller.phone
+        sellerId: currentSeller.id,
+        sellerName: currentSeller.shopName || 'PackBang Verified Factory',
+        sellerPhone: currentSeller.phone
       };
 
       const res = await fetch(`${storeApiUrl}/api/seller/products/create`, {
@@ -463,11 +629,11 @@ export default function SellerDashboard({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sellerId: seller.id || ('SELLER-' + (seller.phone || Date.now())),
-          sellerName: seller.shopName || 'Verified Packaging Supplier',
+          sellerId: currentSeller.id || ('SELLER-' + (currentSeller.phone || Date.now())),
+          sellerName: currentSeller.shopName || 'Verified Packaging Supplier',
           amount: amountNum,
           deliveryTime: '3-5 Days',
-          note: `Factory quotation from ${seller.shopName || 'packaging manufacturer'}`
+          note: `Factory quotation from ${currentSeller.shopName || 'packaging manufacturer'}`
         })
       });
     } catch (err) {
@@ -487,7 +653,7 @@ export default function SellerDashboard({
     setChatFilterWarning(null);
     setIsLoadingMessages(true);
     try {
-      const res = await fetch(`${storeApiUrl}/api/public/custom-order/${item.id}/messages?sellerId=${encodeURIComponent(seller.id || seller.phone || 'seller')}`);
+      const res = await fetch(`${storeApiUrl}/api/public/custom-order/${item.id}/messages?sellerId=${encodeURIComponent(seller.id || currentSeller.phone || 'seller')}`);
       const data = await res.json();
       if (data.success && Array.isArray(data.messages)) {
         setSellerChatMessages(data.messages);
@@ -534,8 +700,8 @@ export default function SellerDashboard({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          sellerId: seller.id || ('SELLER-' + (seller.phone || 'supplier')),
-          sellerName: seller.shopName || 'Verified Packaging Supplier',
+          sellerId: currentSeller.id || ('SELLER-' + (currentSeller.phone || 'supplier')),
+          sellerName: currentSeller.shopName || 'Verified Packaging Supplier',
           text: chatMessageText.trim()
         })
       });
@@ -649,7 +815,7 @@ export default function SellerDashboard({
             gap: '5px'
           }}>
             <span style={{ width: '6px', height: '6px', background: '#10B981', borderRadius: '50%' }}></span>
-            {seller.shopName}
+            {currentSeller.shopName}
           </span>
         </div>
 
@@ -729,10 +895,10 @@ export default function SellerDashboard({
               <span style={{ fontSize: '12px', background: '#059669', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontWeight: 800 }}>
                 ✓ VERIFIED MANUFACTURER
               </span>
-              <span style={{ fontSize: '12px', color: '#94A3B8' }}>Seller ID: {seller.id || 'PB-8942'}</span>
+              <span style={{ fontSize: '12px', color: '#94A3B8' }}>Seller ID: {currentSeller.id || 'PB-8942'}</span>
             </div>
             <h1 style={{ fontSize: '24px', fontWeight: 900, margin: '0 0 6px 0', color: '#FFFFFF' }}>
-              {currentLang === 'bn' ? `স্বাগতম, ${seller.shopName}!` : `Welcome back, ${seller.shopName}!`}
+              {currentLang === 'bn' ? `স্বাগতম, ${currentSeller.shopName}!` : `Welcome back, ${currentSeller.shopName}!`}
             </h1>
             <p style={{ margin: 0, color: '#CBD5E1', fontSize: '14px' }}>
               {currentLang === 'bn'
@@ -776,13 +942,129 @@ export default function SellerDashboard({
           </div>
         </div>
 
-        {/* 4 Metric KPI Cards */}
+        {/* Verification Alert Banner if KYC not completed */}
+        {(!currentSeller.ownerName || !currentSeller.tradeLicenseImage || !currentSeller.nidFrontImage || !currentSeller.nidBackImage) ? (
+          <div style={{
+            background: '#FFFBEB',
+            border: '1.5px solid #F59E0B',
+            borderRadius: '14px',
+            padding: '16px 20px',
+            marginBottom: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '14px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '10px',
+                background: '#FEF3C7',
+                color: '#D97706',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '22px',
+                flexShrink: 0
+              }}>
+                ⚠️
+              </div>
+              <div>
+                <div style={{ fontSize: '15px', fontWeight: 800, color: '#92400E', marginBottom: '2px' }}>
+                  {currentLang === 'bn' ? 'অ্যাকাউন্ট ভেরিফিকেশন বাকি রয়েছে' : 'Account Verification Required (KYC Pending)'}
+                </div>
+                <div style={{ fontSize: '13px', color: '#B45309', lineHeight: 1.4 }}>
+                  {currentLang === 'bn'
+                    ? 'সরকারি বাণিজ্য নীতিমালা অনুযায়ী সেলার নাম, ট্রেড লাইসেন্স এবং এনআইডি (সামনের ও পেছনের অংশ) প্রদান আবশ্যক।'
+                    : 'Bangladesh trade regulations require your Seller Legal Name, Trade License, and National ID (Front & Back parts) to activate direct seller payouts.'}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => setActiveTab('settings')}
+              style={{
+                background: '#D97706',
+                color: '#FFFFFF',
+                border: 'none',
+                padding: '9px 18px',
+                borderRadius: '8px',
+                fontWeight: 700,
+                fontSize: '13px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 2px 8px rgba(217, 119, 6, 0.25)'
+              }}
+            >
+              {currentLang === 'bn' ? 'এখনই ভেরিফাই করুন →' : 'Complete Profile & KYC →'}
+            </button>
+          </div>
+        ) : (currentSeller.kycStatus === 'pending_verification') ? (
+          <div style={{
+            background: '#EFF6FF',
+            border: '1.5px solid #3B82F6',
+            borderRadius: '14px',
+            padding: '16px 20px',
+            marginBottom: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '14px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '10px',
+                background: '#DBEAFE',
+                color: '#2563EB',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '22px',
+                flexShrink: 0
+              }}>
+                ⏳
+              </div>
+              <div>
+                <div style={{ fontSize: '15px', fontWeight: 800, color: '#1E40AF', marginBottom: '2px' }}>
+                  {currentLang === 'bn' ? 'ভেরিফিকেশন প্রক্রিয়াধীন রয়েছে' : 'KYC Verification Under Review'}
+                </div>
+                <div style={{ fontSize: '13px', color: '#1D4ED8', lineHeight: 1.4 }}>
+                  {currentLang === 'bn'
+                    ? 'আপনার ট্রেড লাইসেন্স ও এনআইডি ডকুমেন্ট সফলভাবে জমা হয়েছে। আমাদের দল দ্রুত যাচাই করছে।'
+                    : 'Your Trade License and National ID documents are currently being verified by our compliance team.'}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => setActiveTab('settings')}
+              style={{
+                background: '#2563EB',
+                color: '#FFFFFF',
+                border: 'none',
+                padding: '9px 18px',
+                borderRadius: '8px',
+                fontWeight: 700,
+                fontSize: '13px',
+                cursor: 'pointer'
+              }}
+            >
+              {currentLang === 'bn' ? 'ডকুমেন্ট দেখুন' : 'View Submitted Documents'}
+            </button>
+          </div>
+        ) : null}
+
+        {/* 4 Isolated Metric KPI Cards */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
           gap: '18px',
           marginBottom: '28px'
         }}>
+          {/* Card 1: Individual Seller Stock */}
           <div style={{
             background: '#FFFFFF',
             borderRadius: '14px',
@@ -791,16 +1073,17 @@ export default function SellerDashboard({
             border: '1px solid #E2E8F0'
           }}>
             <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>
-              📦 {currentLang === 'bn' ? 'মোট ডেলিভারিকৃত ইউনিট' : 'Total Units Supplied'}
+              📦 {currentLang === 'bn' ? 'আপনার ইন-স্টক ইউনিট' : 'Total Units in Stock'}
             </div>
             <div style={{ fontSize: '28px', fontWeight: 900, color: '#0F172A', marginBottom: '4px' }}>
-              48,500 <span style={{ fontSize: '14px', fontWeight: 600, color: '#64748B' }}>pcs</span>
+              {products.reduce((acc, p) => acc + (p.stock || 0), 0).toLocaleString()} <span style={{ fontSize: '14px', fontWeight: 600, color: '#64748B' }}>pcs</span>
             </div>
             <div style={{ fontSize: '12px', color: '#10B981', fontWeight: 700 }}>
-              ↑ +18.4% {currentLang === 'bn' ? 'গত মাসের চেয়ে বৃদ্ধি' : 'growth this month'}
+              {products.length} {currentLang === 'bn' ? 'টি পণ্য লাইভ ক্যাটালগে' : 'active packaging listings'}
             </div>
           </div>
 
+          {/* Card 2: Individual Seller Total Sales */}
           <div style={{
             background: '#FFFFFF',
             borderRadius: '14px',
@@ -809,16 +1092,17 @@ export default function SellerDashboard({
             border: '1px solid #E2E8F0'
           }}>
             <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>
-              💰 {currentLang === 'bn' ? 'মোট বিক্রি (রেভিনিউ)' : 'Total Revenue'}
+              💰 {currentLang === 'bn' ? 'আপনার মোট বিক্রি (রেভিনিউ)' : 'Total Sales (Revenue)'}
             </div>
             <div style={{ fontSize: '28px', fontWeight: 900, color: '#FF5A1F', marginBottom: '4px' }}>
-              ৳ 2,45,800
+              ৳ {((sellerMetrics.totalRevenue || orders.reduce((sum, o) => sum + (o.status === 'Delivered' ? o.amount : 0), 0)) || 0).toLocaleString()}
             </div>
             <div style={{ fontSize: '12px', color: '#059669', fontWeight: 700 }}>
-              ✓ {currentLang === 'bn' ? 'সাপ্তাহিক ব্যাংক পে-আউট সক্রিয়' : 'Weekly Bank Settlement Active'}
+              ✓ {currentLang === 'bn' ? 'সরাসরি সেলার পে-আউট সক্রিয়' : 'Direct Seller Payout Active'}
             </div>
           </div>
 
+          {/* Card 3: Custom Wholesale Bids Placed */}
           <div style={{
             background: '#FFFFFF',
             borderRadius: '14px',
@@ -827,16 +1111,17 @@ export default function SellerDashboard({
             border: '1px solid #E2E8F0'
           }}>
             <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>
-              ⚡ {currentLang === 'bn' ? 'কাস্টম পাইকারি বিড' : 'Custom Wholesale Bids'}
+              ⚡ {currentLang === 'bn' ? 'কাস্টম পাইকারি বিড' : 'Wholesale Bids Placed'}
             </div>
             <div style={{ fontSize: '28px', fontWeight: 900, color: '#2563EB', marginBottom: '4px' }}>
-              3 <span style={{ fontSize: '14px', fontWeight: 600, color: '#64748B' }}>pending</span>
+              {sellerMetrics.bidsPlaced || bids.filter(b => b.bidPlaced !== undefined).length} <span style={{ fontSize: '14px', fontWeight: 600, color: '#64748B' }}>bids</span>
             </div>
             <div style={{ fontSize: '12px', color: '#2563EB', fontWeight: 700 }}>
-              Dhaka Boutique Stores Waiting
+              {bids.length} {currentLang === 'bn' ? 'টি ওপেন রিকোয়েস্ট মার্কেটপ্লেসে' : 'open inquiries available'}
             </div>
           </div>
 
+          {/* Card 4: Orders & Shipments */}
           <div style={{
             background: '#FFFFFF',
             borderRadius: '14px',
@@ -845,13 +1130,13 @@ export default function SellerDashboard({
             border: '1px solid #E2E8F0'
           }}>
             <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>
-              🚚 {currentLang === 'bn' ? 'লজিস্টিক ও কুরিয়ার পার্টনার' : 'Active Shipments'}
+              🚚 {currentLang === 'bn' ? 'আপনার অর্ডারসমূহ' : 'Factory Orders'}
             </div>
             <div style={{ fontSize: '28px', fontWeight: 900, color: '#0F172A', marginBottom: '4px' }}>
-              18 <span style={{ fontSize: '14px', fontWeight: 600, color: '#64748B' }}>parcels</span>
+              {orders.length} <span style={{ fontSize: '14px', fontWeight: 600, color: '#64748B' }}>orders</span>
             </div>
             <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700 }}>
-              Tracked via Steadfast Courier
+              {orders.filter(o => o.status === 'Processing').length} {currentLang === 'bn' ? 'টি শিপমেন্ট প্রক্রিয়াধীন' : 'awaiting dispatch'}
             </div>
           </div>
         </div>
@@ -904,50 +1189,103 @@ export default function SellerDashboard({
               border: '1px solid #E2E8F0',
               boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0F172A' }}>
-                  {currentLang === 'bn' ? 'সাম্প্রতিক প্যাকেজিং অর্ডারসমূহ' : 'Recent Packaging Orders'}
-                </h3>
-                <span style={{ fontSize: '13px', color: '#64748B' }}>Showing last 3 bulk shipments</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
+                <div>
+                  <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 4px 0', color: '#0F172A' }}>
+                    {currentLang === 'bn' ? 'আপনার সাম্প্রতিক প্যাকেজিং অর্ডারসমূহ' : 'Your Recent Packaging Orders'}
+                  </h3>
+                  <div style={{ fontSize: '13px', color: '#64748B' }}>
+                    {orders.length > 0 ? `Showing ${orders.length} orders for your factory` : 'Isolated exclusively to your store'}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  style={{
+                    background: '#FF5A1F',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  + {currentLang === 'bn' ? 'পণ্য যোগ করুন' : 'Post Product'}
+                </button>
               </div>
 
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
-                  <thead>
-                    <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', color: '#475569' }}>
-                      <th style={{ padding: '12px 16px' }}>Order ID</th>
-                      <th style={{ padding: '12px 16px' }}>Buyer Store</th>
-                      <th style={{ padding: '12px 16px' }}>Item Specifications</th>
-                      <th style={{ padding: '12px 16px' }}>Amount</th>
-                      <th style={{ padding: '12px 16px' }}>Date</th>
-                      <th style={{ padding: '12px 16px' }}>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orders.map(o => (
-                      <tr key={o.orderId} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                        <td style={{ padding: '14px 16px', fontWeight: 800, color: '#FF5A1F' }}>{o.orderId}</td>
-                        <td style={{ padding: '14px 16px', fontWeight: 700 }}>{o.buyerShop}</td>
-                        <td style={{ padding: '14px 16px', color: '#475569' }}>{o.items}</td>
-                        <td style={{ padding: '14px 16px', fontWeight: 800 }}>৳ {o.amount.toLocaleString()}</td>
-                        <td style={{ padding: '14px 16px', color: '#64748B', fontSize: '13px' }}>{o.date}</td>
-                        <td style={{ padding: '14px 16px' }}>
-                          <span style={{
-                            padding: '4px 10px',
-                            borderRadius: '12px',
-                            fontSize: '12px',
-                            fontWeight: 800,
-                            background: o.status === 'Delivered' ? '#DEF7EC' : o.status === 'Shipped' ? '#E1EFFE' : '#FEF08A',
-                            color: o.status === 'Delivered' ? '#03543F' : o.status === 'Shipped' ? '#1E429F' : '#854D0E'
-                          }}>
-                            {o.status}
-                          </span>
-                        </td>
+              {isLoadingOrders ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#64748B' }}>
+                  <div style={{ fontSize: '28px', marginBottom: '8px' }}>⏳</div>
+                  <div>Loading your factory orders...</div>
+                </div>
+              ) : orders.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '48px 20px', color: '#64748B' }}>
+                  <div style={{ fontSize: '46px', marginBottom: '12px' }}>📦</div>
+                  <h4 style={{ fontSize: '17px', fontWeight: 800, color: '#0F172A', margin: '0 0 6px 0' }}>
+                    {currentLang === 'bn' ? 'এখনও কোনো অর্ডার আসেনি' : 'No packaging orders yet'}
+                  </h4>
+                  <p style={{ fontSize: '13px', margin: '0 auto 20px auto', maxWidth: '440px', lineHeight: 1.5 }}>
+                    {currentLang === 'bn'
+                      ? 'আপনার তালিকাভুক্ত পণ্যগুলো packbang.com এর মার্কেটপ্লেসে লাইভ প্রদর্শিত হচ্ছে। ক্রেতারা অর্ডার করলে সরাসরি এখানে দেখতে পাবেন।'
+                      : 'Your inventory is active on packbang.com storefront. Direct customer purchases and custom bulk orders assigned to your factory will appear here in real time.'}
+                  </p>
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    style={{
+                      background: '#FF5A1F',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      padding: '10px 22px',
+                      borderRadius: '8px',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    + {currentLang === 'bn' ? 'নতুন পণ্য পোস্ট করুন' : 'Add Packaging Item to Catalog'}
+                  </button>
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+                    <thead>
+                      <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', color: '#475569' }}>
+                        <th style={{ padding: '12px 16px' }}>Order ID</th>
+                        <th style={{ padding: '12px 16px' }}>Buyer Store</th>
+                        <th style={{ padding: '12px 16px' }}>Item Specifications</th>
+                        <th style={{ padding: '12px 16px' }}>Amount</th>
+                        <th style={{ padding: '12px 16px' }}>Date</th>
+                        <th style={{ padding: '12px 16px' }}>Status</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {orders.map(o => (
+                        <tr key={o.orderId} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                          <td style={{ padding: '14px 16px', fontWeight: 800, color: '#FF5A1F' }}>{o.orderId}</td>
+                          <td style={{ padding: '14px 16px', fontWeight: 700 }}>{o.buyerShop}</td>
+                          <td style={{ padding: '14px 16px', color: '#475569' }}>{o.items}</td>
+                          <td style={{ padding: '14px 16px', fontWeight: 800 }}>৳ {o.amount.toLocaleString()}</td>
+                          <td style={{ padding: '14px 16px', color: '#64748B', fontSize: '13px' }}>{o.date}</td>
+                          <td style={{ padding: '14px 16px' }}>
+                            <span style={{
+                              padding: '4px 10px',
+                              borderRadius: '12px',
+                              fontSize: '12px',
+                              fontWeight: 800,
+                              background: o.status === 'Delivered' ? '#DEF7EC' : o.status === 'Shipped' ? '#E1EFFE' : '#FEF08A',
+                              color: o.status === 'Delivered' ? '#03543F' : o.status === 'Shipped' ? '#1E429F' : '#854D0E'
+                            }}>
+                              {o.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1390,54 +1728,693 @@ export default function SellerDashboard({
           </div>
         )}
 
-        {/* TAB 4: FACTORY PROFILE & SETTINGS */}
+        {/* TAB 4: FACTORY PROFILE & KYC VERIFICATION */}
         {activeTab === 'settings' && (
-          <div style={{
-            background: '#FFFFFF',
-            borderRadius: '14px',
-            padding: '28px',
-            border: '1px solid #E2E8F0',
-            maxWidth: '700px'
-          }}>
-            <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 16px 0' }}>
-              {currentLang === 'bn' ? 'কারখানা প্রোফাইল ও পে-আউট তথ্য' : 'Packaging Factory Profile & Payout Info'}
-            </h3>
+          <div style={{ maxWidth: '820px' }}>
+            <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Shop Name</label>
-                <input type="text" readOnly value={seller.shopName} style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#F8FAFC' }} />
+              {/* Status Header Banner */}
+              <div style={{
+                background: currentSeller.kycStatus === 'verified'
+                  ? '#ECFDF5'
+                  : currentSeller.kycStatus === 'pending_verification'
+                    ? '#EFF6FF'
+                    : '#FFFBEB',
+                border: `1.5px solid ${
+                  currentSeller.kycStatus === 'verified'
+                    ? '#10B981'
+                    : currentSeller.kycStatus === 'pending_verification'
+                      ? '#3B82F6'
+                      : '#F59E0B'
+                }`,
+                borderRadius: '14px',
+                padding: '20px 24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '16px'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <span style={{
+                      padding: '4px 10px',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      fontWeight: 800,
+                      background: currentSeller.kycStatus === 'verified' ? '#059669' : currentSeller.kycStatus === 'pending_verification' ? '#2563EB' : '#D97706',
+                      color: '#FFFFFF'
+                    }}>
+                      {currentSeller.kycStatus === 'verified'
+                        ? '✓ VERIFIED SUPPLIER'
+                        : currentSeller.kycStatus === 'pending_verification'
+                          ? '⏳ VERIFICATION UNDER REVIEW'
+                          : '⚠️ KYC ACTION REQUIRED'}
+                    </span>
+                    <span style={{ fontSize: '13px', color: '#64748B' }}>
+                      Seller ID: {currentSeller.id}
+                    </span>
+                  </div>
+                  <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '6px 0 2px 0', color: '#0F172A' }}>
+                    {currentLang === 'bn' ? 'সেলার প্রোফাইল ও কেওয়াইসি (KYC) তথ্য' : 'Seller Profile & KYC Identity Verification'}
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#475569' }}>
+                    {currentLang === 'bn'
+                      ? 'অ্যাকাউন্ট তৈরির পর সেলারের নাম, ট্রেড লাইসেন্স এবং জাতীয় পরিচয়পত্রের (NID) উভয় অংশ জমা দেওয়া বাধ্যতামূলক।'
+                      : 'Seller Legal Name, Trade License, and National ID (Front & Back parts) are strictly required for supplier verification.'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Registered Phone</label>
-                <input type="text" readOnly value={seller.phone} style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#F8FAFC' }} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Manufacturing Hub Address</label>
-                <input type="text" defaultValue="Armanitola / Chawkbazar Packaging Cluster, Dhaka" style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #CBD5E1' }} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Bank Account for Weekly Settlements</label>
-                <input type="text" defaultValue="Dutch-Bangla Bank (Agent / Current A/C) - Verified" style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #CBD5E1' }} />
-              </div>
-            </div>
 
-            <button
-              onClick={() => showToast('Profile settings saved successfully.')}
-              style={{
-                marginTop: '20px',
-                background: '#0F172A',
-                color: '#FFFFFF',
-                border: 'none',
-                padding: '10px 22px',
-                borderRadius: '8px',
-                fontWeight: 700,
-                fontSize: '14px',
-                cursor: 'pointer'
-              }}
-            >
-              Save Profile Changes
-            </button>
+              {/* SECTION 1: SELLER IDENTITY & SHOP DETAILS */}
+              <div style={{
+                background: '#FFFFFF',
+                borderRadius: '14px',
+                padding: '24px',
+                border: '1px solid #E2E8F0',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
+              }}>
+                <h4 style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>👤</span>
+                  <span>{currentLang === 'bn' ? '১. সেলার ও কারখানা পরিচিতি' : '1. Seller Identity & Factory Details'}</span>
+                </h4>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                      {currentLang === 'bn' ? 'সেলার নাম (মালিকের নাম) *' : 'Seller Legal Name (Owner Name) *'}
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={profileOwnerName}
+                      onChange={e => setProfileOwnerName(e.target.value)}
+                      placeholder="e.g. Md. Rafiqul Islam"
+                      style={{
+                        width: '100%',
+                        padding: '11px 14px',
+                        borderRadius: '8px',
+                        border: '1px solid #CBD5E1',
+                        fontSize: '14px',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                      {currentLang === 'bn' ? 'দোকান / কারখানার নাম *' : 'Packaging Shop / Factory Name *'}
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={profileShopName}
+                      onChange={e => setProfileShopName(e.target.value)}
+                      placeholder="e.g. Dhaka Poly & Packaging Mills"
+                      style={{
+                        width: '100%',
+                        padding: '11px 14px',
+                        borderRadius: '8px',
+                        border: '1px solid #CBD5E1',
+                        fontSize: '14px',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                      {currentLang === 'bn' ? 'নিবন্ধিত ফোন নম্বর' : 'Registered Phone Number'}
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={currentSeller.phone}
+                      style={{
+                        width: '100%',
+                        padding: '11px 14px',
+                        borderRadius: '8px',
+                        border: '1px solid #CBD5E1',
+                        fontSize: '14px',
+                        background: '#F8FAFC',
+                        color: '#64748B',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                      {currentLang === 'bn' ? 'অফিসিয়াল ইমেইল এড্রেস' : 'Business Email Address'}
+                    </label>
+                    <input
+                      type="email"
+                      value={profileEmail}
+                      onChange={e => setProfileEmail(e.target.value)}
+                      placeholder="factory@packaging.com"
+                      style={{
+                        width: '100%',
+                        padding: '11px 14px',
+                        borderRadius: '8px',
+                        border: '1px solid #CBD5E1',
+                        fontSize: '14px',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    {currentLang === 'bn' ? 'কারখানা ও গুদামের ঠিকানা (ফুল এড্রেস)' : 'Factory Hub / Warehouse Address'}
+                  </label>
+                  <input
+                    type="text"
+                    value={profileAddress}
+                    onChange={e => setProfileAddress(e.target.value)}
+                    placeholder="e.g. Plot 14, Road 4, Chawkbazar Packaging Cluster, Dhaka-1211"
+                    style={{
+                      width: '100%',
+                      padding: '11px 14px',
+                      borderRadius: '8px',
+                      border: '1px solid #CBD5E1',
+                      fontSize: '14px',
+                      outline: 'none',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* SECTION 2: TRADE LICENSE VERIFICATION */}
+              <div style={{
+                background: '#FFFFFF',
+                borderRadius: '14px',
+                padding: '24px',
+                border: '1px solid #E2E8F0',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+                  <h4 style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>📜</span>
+                    <span>{currentLang === 'bn' ? '২. ট্রেড লাইসেন্স ভেরিফিকেশন (Trade License) *' : '2. Trade License Verification *'}</span>
+                  </h4>
+                  <span style={{ fontSize: '12px', background: '#FEF3C7', color: '#92400E', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                    Required for Factory Clearance
+                  </span>
+                </div>
+
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    {currentLang === 'bn' ? 'ট্রেড লাইসেন্স নম্বর *' : 'Trade License Number *'}
+                  </label>
+                  <input
+                    type="text"
+                    value={profileTradeLicenseNumber}
+                    onChange={e => setProfileTradeLicenseNumber(e.target.value)}
+                    placeholder="e.g. TRAD/DNCC/019284/2024"
+                    style={{
+                      width: '100%',
+                      padding: '11px 14px',
+                      borderRadius: '8px',
+                      border: '1px solid #CBD5E1',
+                      fontSize: '14px',
+                      outline: 'none',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>
+                    {currentLang === 'bn' ? 'ট্রেড লাইসেন্স ডকুমেন্ট কপি (ছবি বা স্ক্যান কপি) *' : 'Trade License Document (Photo or Certificate Scan) *'}
+                  </label>
+
+                  {profileTradeLicenseImage ? (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '16px',
+                      padding: '14px',
+                      borderRadius: '10px',
+                      border: '1px solid #CBD5E1',
+                      background: '#F8FAFC'
+                    }}>
+                      <img
+                        src={profileTradeLicenseImage}
+                        alt="Trade License"
+                        style={{ width: '80px', height: '60px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #CBD5E1' }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
+                          ✓ Trade License Uploaded
+                        </div>
+                        <a
+                          href={profileTradeLicenseImage}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ fontSize: '12px', color: '#FF5A1F', textDecoration: 'none', fontWeight: 600 }}
+                        >
+                          View Full Document ↗
+                        </a>
+                      </div>
+                      <label style={{
+                        background: '#EFF6FF',
+                        color: '#1D4ED8',
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        border: '1px solid #BFDBFE'
+                      }}>
+                        Change Document
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          onChange={e => handleDocFileUpload(e, 'tradeLicense')}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setProfileTradeLicenseImage('')}
+                        style={{
+                          background: '#FEF2F2',
+                          color: '#DC2626',
+                          border: '1px solid #FECACA',
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <label style={{
+                      border: '2px dashed #CBD5E1',
+                      borderRadius: '12px',
+                      padding: '24px 20px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      background: '#F8FAFC',
+                      transition: 'all 0.2s'
+                    }}>
+                      <div style={{ fontSize: '28px', marginBottom: '8px' }}>
+                        {uploadingDocType === 'tradeLicense' ? '⏳' : '📄'}
+                      </div>
+                      <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>
+                        {uploadingDocType === 'tradeLicense' ? 'Uploading Trade License...' : 'Click to Upload Trade License Document'}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>
+                        Supports JPG, PNG, WEBP (Max 10MB)
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        disabled={uploadingDocType === 'tradeLicense'}
+                        onChange={e => handleDocFileUpload(e, 'tradeLicense')}
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              {/* SECTION 3: NATIONAL ID (NID) - FRONT & BACK PARTS */}
+              <div style={{
+                background: '#FFFFFF',
+                borderRadius: '14px',
+                padding: '24px',
+                border: '1px solid #E2E8F0',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+                  <h4 style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>🪪</span>
+                    <span>{currentLang === 'bn' ? '৩. জাতীয় পরিচয়পত্র (NID) ভেরিফিকেশন *' : '3. National ID (NID) Verification *'}</span>
+                  </h4>
+                  <span style={{ fontSize: '12px', background: '#FEF3C7', color: '#92400E', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                    Both Front & Back Parts Required
+                  </span>
+                </div>
+
+                <div style={{ marginBottom: '18px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                    {currentLang === 'bn' ? 'জাতীয় পরিচয়পত্র (NID) নম্বর *' : 'National ID (NID) Number *'}
+                  </label>
+                  <input
+                    type="text"
+                    value={profileNidNumber}
+                    onChange={e => setProfileNidNumber(e.target.value)}
+                    placeholder="e.g. 19912692019000342 (10, 13 or 17 digits)"
+                    style={{
+                      width: '100%',
+                      padding: '11px 14px',
+                      borderRadius: '8px',
+                      border: '1px solid #CBD5E1',
+                      fontSize: '14px',
+                      outline: 'none',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                  
+                  {/* NID FRONT PART */}
+                  <div style={{ border: '1px solid #E2E8F0', borderRadius: '10px', padding: '16px', background: '#FAFAFA' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A' }}>
+                        {currentLang === 'bn' ? 'NID সামনের অংশ (Front Part) *' : 'NID Front Part (Photo Side) *'}
+                      </div>
+                      {profileNidFrontImage && (
+                        <span style={{ fontSize: '11px', background: '#DEF7EC', color: '#03543F', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                          ✓ Done
+                        </span>
+                      )}
+                    </div>
+
+                    {profileNidFrontImage ? (
+                      <div>
+                        <img
+                          src={profileNidFrontImage}
+                          alt="NID Front"
+                          style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #CBD5E1', marginBottom: '10px' }}
+                        />
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <label style={{
+                            flex: 1,
+                            textAlign: 'center',
+                            background: '#EFF6FF',
+                            color: '#1D4ED8',
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            border: '1px solid #BFDBFE'
+                          }}>
+                            Change Front
+                            <input
+                              type="file"
+                              accept="image/*"
+                              style={{ display: 'none' }}
+                              onChange={e => handleDocFileUpload(e, 'nidFront')}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setProfileNidFrontImage('')}
+                            style={{
+                              background: '#FEF2F2',
+                              color: '#DC2626',
+                              border: '1px solid #FECACA',
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <label style={{
+                        border: '2px dashed #CBD5E1',
+                        borderRadius: '8px',
+                        padding: '24px 16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        background: '#FFFFFF',
+                        minHeight: '130px'
+                      }}>
+                        <div style={{ fontSize: '24px', marginBottom: '6px' }}>
+                          {uploadingDocType === 'nidFront' ? '⏳' : '📷'}
+                        </div>
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A', textAlign: 'center' }}>
+                          {uploadingDocType === 'nidFront' ? 'Uploading...' : 'Upload NID Front Part'}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
+                          Photo & Date of Birth side
+                        </div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          disabled={uploadingDocType === 'nidFront'}
+                          onChange={e => handleDocFileUpload(e, 'nidFront')}
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                  {/* NID BACK PART */}
+                  <div style={{ border: '1px solid #E2E8F0', borderRadius: '10px', padding: '16px', background: '#FAFAFA' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A' }}>
+                        {currentLang === 'bn' ? 'NID পেছনের অংশ (Back Part) *' : 'NID Back Part (Address Side) *'}
+                      </div>
+                      {profileNidBackImage && (
+                        <span style={{ fontSize: '11px', background: '#DEF7EC', color: '#03543F', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                          ✓ Done
+                        </span>
+                      )}
+                    </div>
+
+                    {profileNidBackImage ? (
+                      <div>
+                        <img
+                          src={profileNidBackImage}
+                          alt="NID Back"
+                          style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #CBD5E1', marginBottom: '10px' }}
+                        />
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <label style={{
+                            flex: 1,
+                            textAlign: 'center',
+                            background: '#EFF6FF',
+                            color: '#1D4ED8',
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            border: '1px solid #BFDBFE'
+                          }}>
+                            Change Back
+                            <input
+                              type="file"
+                              accept="image/*"
+                              style={{ display: 'none' }}
+                              onChange={e => handleDocFileUpload(e, 'nidBack')}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setProfileNidBackImage('')}
+                            style={{
+                              background: '#FEF2F2',
+                              color: '#DC2626',
+                              border: '1px solid #FECACA',
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <label style={{
+                        border: '2px dashed #CBD5E1',
+                        borderRadius: '8px',
+                        padding: '24px 16px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        background: '#FFFFFF',
+                        minHeight: '130px'
+                      }}>
+                        <div style={{ fontSize: '24px', marginBottom: '6px' }}>
+                          {uploadingDocType === 'nidBack' ? '⏳' : '📷'}
+                        </div>
+                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A', textAlign: 'center' }}>
+                          {uploadingDocType === 'nidBack' ? 'Uploading...' : 'Upload NID Back Part'}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
+                          Address & Barcode side
+                        </div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          style={{ display: 'none' }}
+                          disabled={uploadingDocType === 'nidBack'}
+                          onChange={e => handleDocFileUpload(e, 'nidBack')}
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                </div>
+              </div>
+
+              {/* SECTION 4: BANK & SETTLEMENT DETAILS */}
+              <div style={{
+                background: '#FFFFFF',
+                borderRadius: '14px',
+                padding: '24px',
+                border: '1px solid #E2E8F0',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
+              }}>
+                <h4 style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A', margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>🏦</span>
+                  <span>{currentLang === 'bn' ? '৪. পেমেন্ট সেটেলমেন্ট ব্যাংক অ্যাকাউন্ট' : '4. Settlement Bank & Payout Details'}</span>
+                </h4>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>Bank Name</label>
+                    <input
+                      type="text"
+                      value={profileBankName}
+                      onChange={e => setProfileBankName(e.target.value)}
+                      placeholder="e.g. Dutch-Bangla Bank PLC"
+                      style={{
+                        width: '100%',
+                        padding: '11px 14px',
+                        borderRadius: '8px',
+                        border: '1px solid #CBD5E1',
+                        fontSize: '14px',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>Account Holder Name</label>
+                    <input
+                      type="text"
+                      value={profileAccountHolderName}
+                      onChange={e => setProfileAccountHolderName(e.target.value)}
+                      placeholder="e.g. Md. Rafiqul Islam"
+                      style={{
+                        width: '100%',
+                        padding: '11px 14px',
+                        borderRadius: '8px',
+                        border: '1px solid #CBD5E1',
+                        fontSize: '14px',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>Bank Account Number</label>
+                    <input
+                      type="text"
+                      value={profileAccountNumber}
+                      onChange={e => setProfileAccountNumber(e.target.value)}
+                      placeholder="e.g. 120.101.002891"
+                      style={{
+                        width: '100%',
+                        padding: '11px 14px',
+                        borderRadius: '8px',
+                        border: '1px solid #CBD5E1',
+                        fontSize: '14px',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>Branch Name</label>
+                    <input
+                      type="text"
+                      value={profileBranchName}
+                      onChange={e => setProfileBranchName(e.target.value)}
+                      placeholder="e.g. Chawkbazar Branch, Dhaka"
+                      style={{
+                        width: '100%',
+                        padding: '11px 14px',
+                        borderRadius: '8px',
+                        border: '1px solid #CBD5E1',
+                        fontSize: '14px',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>bKash / Nagad Merchant Number</label>
+                    <input
+                      type="text"
+                      value={profileBkashNumber}
+                      onChange={e => setProfileBkashNumber(e.target.value)}
+                      placeholder="e.g. 01712345678"
+                      style={{
+                        width: '100%',
+                        padding: '11px 14px',
+                        borderRadius: '8px',
+                        border: '1px solid #CBD5E1',
+                        fontSize: '14px',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SAVE / SUBMIT BUTTON */}
+              <div>
+                <button
+                  type="submit"
+                  disabled={isSavingProfile}
+                  style={{
+                    background: '#0F172A',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    padding: '14px 28px',
+                    borderRadius: '10px',
+                    fontWeight: 800,
+                    fontSize: '15px',
+                    cursor: isSavingProfile ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 4px 14px rgba(15, 23, 42, 0.25)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  {isSavingProfile ? '⏳ Saving Documents...' : '💾 Save & Submit Verification Documents'}
+                </button>
+              </div>
+
+            </form>
           </div>
         )}
 

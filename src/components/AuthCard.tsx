@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import axios from 'axios';
+import { type SellerProfile } from './SellerDashboard';
 
 interface AuthCardProps {
   currentLang: 'en' | 'bn';
@@ -7,13 +8,7 @@ interface AuthCardProps {
   onSellerChange?: (seller: SellerProfile | null) => void;
 }
 
-interface SellerProfile {
-  id: string;
-  phone: string;
-  shopName: string;
-  email?: string;
-  tier?: string;
-}
+
 
 export default function AuthCard({ currentLang, onOpenDashboard, onSellerChange }: AuthCardProps) {
   const [authMode, setAuthMode] = useState<'password' | 'sms' | 'register' | 'qr'>('password');

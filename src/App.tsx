@@ -42,6 +42,7 @@ export default function App() {
         onLogout={handleLogout}
         onGoLanding={() => setCurrentView('landing')}
         onLangChange={setCurrentLang}
+        onSellerUpdate={(updated) => setSeller(updated)}
       />
     );
   }
