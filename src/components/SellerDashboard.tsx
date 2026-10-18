@@ -14,6 +14,13 @@ export interface SellerProfile {
   nidBackImage?: string;
   kycStatus?: 'unverified' | 'pending_verification' | 'verified' | 'rejected';
   kycSubmittedAt?: string;
+  status?: 'pending_approval' | 'approved' | 'active' | 'pending' | 'rejected' | 'suspended' | 'banned';
+  rejectionReason?: string;
+  suspendedUntil?: string;
+  suspensionReason?: string;
+  banReason?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
   bankDetails?: {
     bankName?: string;
     accountNumber?: string;
@@ -87,6 +94,20 @@ export default function SellerDashboard({
   useEffect(() => {
     setCurrentSeller(seller);
   }, [seller]);
+
+  // Seller Approval Status Checks
+  const isApproved = currentSeller.status === 'approved' || currentSeller.status === 'active';
+  const isSuspended = currentSeller.status === 'suspended';
+  const isBanned = currentSeller.status === 'banned';
+  const isRejected = currentSeller.status === 'rejected';
+  const isPendingApproval = !isApproved && !isSuspended && !isBanned && !isRejected;
+
+  const hasRequiredKyc = Boolean(
+    currentSeller.ownerName &&
+    (currentSeller.tradeLicenseNumber || currentSeller.tradeLicenseImage) &&
+    currentSeller.nidFrontImage &&
+    currentSeller.nidBackImage
+  );
   const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'bids' | 'settings'>('overview');
   const [showAddModal, setShowAddModal] = useState(false);
   const [bidModalItem, setBidModalItem] = useState<CustomBidRequest | null>(null);
@@ -892,8 +913,23 @@ export default function SellerDashboard({
         }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-              <span style={{ fontSize: '12px', background: '#059669', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontWeight: 800 }}>
-                ✓ VERIFIED MANUFACTURER
+              <span style={{
+                fontSize: '12px',
+                background: isApproved ? '#059669' : isSuspended ? '#7C3AED' : isBanned ? '#991B1B' : isRejected ? '#DC2626' : '#D97706',
+                color: '#fff',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                fontWeight: 800
+              }}>
+                {isApproved
+                  ? '✓ APPROVED SUPPLIER'
+                  : isSuspended
+                    ? '⏸ ACCOUNT SUSPENDED'
+                    : isBanned
+                      ? '🚫 ACCOUNT BANNED'
+                      : isRejected
+                        ? '✕ APPLICATION REJECTED'
+                        : '⏳ PENDING ADMIN APPROVAL'}
               </span>
               <span style={{ fontSize: '12px', color: '#94A3B8' }}>Seller ID: {currentSeller.id || 'PB-8942'}</span>
             </div>
@@ -909,9 +945,27 @@ export default function SellerDashboard({
 
           <div style={{ display: 'flex', gap: '10px' }}>
             <button
-              onClick={() => setShowAddModal(true)}
+              onClick={() => {
+                if (!hasRequiredKyc) {
+                  showToast(currentLang === 'bn' ? 'অনুগ্রহ করে প্রথমে আপনার ট্রেড লাইসেন্স ও এনআইডি জমা দিন।' : 'Please complete your Trade License and NID verification in Tab 4 first.');
+                  setActiveTab('settings');
+                } else if (!isApproved) {
+                  if (isPendingApproval) {
+                    showToast(currentLang === 'bn' ? 'আপনার অ্যাকাউন্ট অ্যাডমিন অনুমোদনের অপেক্ষায় রয়েছে। অনুমোদনের পর পণ্য যোগ করতে পারবেন।' : 'Your account is pending admin approval. You can post products after admin approval.');
+                  } else if (isSuspended) {
+                    showToast(currentLang === 'bn' ? 'অ্যাকাউন্ট স্থগিত রয়েছে। নতুন পণ্য যোগ করা সম্ভব নয়।' : 'Account is currently suspended. You cannot add products during suspension.');
+                  } else if (isRejected) {
+                    showToast(currentLang === 'bn' ? 'আবেদন বাতিল হয়েছে। অনুগ্রহ করে প্রোফাইল আপডেট করুন।' : 'Application was rejected. Please update documents in Tab 4 to resubmit.');
+                    setActiveTab('settings');
+                  } else if (isBanned) {
+                    showToast(currentLang === 'bn' ? 'অ্যাকাউন্ট চিরতরে ব্যান করা হয়েছে।' : 'Account permanently banned.');
+                  }
+                } else {
+                  setShowAddModal(true);
+                }
+              }}
               style={{
-                background: '#FF5A1F',
+                background: isApproved ? '#FF5A1F' : '#64748B',
                 color: '#fff',
                 border: 'none',
                 padding: '12px 20px',
@@ -919,7 +973,7 @@ export default function SellerDashboard({
                 fontWeight: 700,
                 fontSize: '14px',
                 cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(255, 90, 31, 0.4)'
+                boxShadow: isApproved ? '0 4px 14px rgba(255, 90, 31, 0.4)' : 'none'
               }}
             >
               + {currentLang === 'bn' ? 'প্যাকেজিং পণ্য যোগ করুন' : 'Add Packaging Item'}
@@ -942,8 +996,8 @@ export default function SellerDashboard({
           </div>
         </div>
 
-        {/* Verification Alert Banner if KYC not completed */}
-        {(!currentSeller.ownerName || !currentSeller.tradeLicenseImage || !currentSeller.nidFrontImage || !currentSeller.nidBackImage) ? (
+        {/* DYNAMIC STATUS & VERIFICATION BANNERS */}
+        {!hasRequiredKyc ? (
           <div style={{
             background: '#FFFBEB',
             border: '1.5px solid #F59E0B',
@@ -973,12 +1027,12 @@ export default function SellerDashboard({
               </div>
               <div>
                 <div style={{ fontSize: '15px', fontWeight: 800, color: '#92400E', marginBottom: '2px' }}>
-                  {currentLang === 'bn' ? 'অ্যাকাউন্ট ভেরিফিকেশন বাকি রয়েছে' : 'Account Verification Required (KYC Pending)'}
+                  {currentLang === 'bn' ? 'কেওয়াইসি তথ্য বাকি রয়েছে' : 'Action Required: Incomplete Verification Documents'}
                 </div>
                 <div style={{ fontSize: '13px', color: '#B45309', lineHeight: 1.4 }}>
                   {currentLang === 'bn'
-                    ? 'সরকারি বাণিজ্য নীতিমালা অনুযায়ী সেলার নাম, ট্রেড লাইসেন্স এবং এনআইডি (সামনের ও পেছনের অংশ) প্রদান আবশ্যক।'
-                    : 'Bangladesh trade regulations require your Seller Legal Name, Trade License, and National ID (Front & Back parts) to activate direct seller payouts.'}
+                    ? 'অ্যাকাউন্ট তৈরির পর সেলার নাম, ট্রেড লাইসেন্স এবং এনআইডি (উভয় অংশ) জমা দেওয়া আবশ্যক।'
+                    : 'Please provide your Seller Legal Name, Trade License, and National ID (Front & Back parts) to send your approval request to admin.'}
                 </div>
               </div>
             </div>
@@ -997,10 +1051,10 @@ export default function SellerDashboard({
                 boxShadow: '0 2px 8px rgba(217, 119, 6, 0.25)'
               }}
             >
-              {currentLang === 'bn' ? 'এখনই ভেরিফাই করুন →' : 'Complete Profile & KYC →'}
+              {currentLang === 'bn' ? 'এখনই তথ্য জমা দিন →' : 'Complete Profile Documents →'}
             </button>
           </div>
-        ) : (currentSeller.kycStatus === 'pending_verification') ? (
+        ) : isPendingApproval ? (
           <div style={{
             background: '#EFF6FF',
             border: '1.5px solid #3B82F6',
@@ -1030,12 +1084,12 @@ export default function SellerDashboard({
               </div>
               <div>
                 <div style={{ fontSize: '15px', fontWeight: 800, color: '#1E40AF', marginBottom: '2px' }}>
-                  {currentLang === 'bn' ? 'ভেরিফিকেশন প্রক্রিয়াধীন রয়েছে' : 'KYC Verification Under Review'}
+                  {currentLang === 'bn' ? 'অ্যাডমিন অনুমোদনের অপেক্ষায় রয়েছে' : 'Account Under Admin Review & Verification'}
                 </div>
                 <div style={{ fontSize: '13px', color: '#1D4ED8', lineHeight: 1.4 }}>
                   {currentLang === 'bn'
-                    ? 'আপনার ট্রেড লাইসেন্স ও এনআইডি ডকুমেন্ট সফলভাবে জমা হয়েছে। আমাদের দল দ্রুত যাচাই করছে।'
-                    : 'Your Trade License and National ID documents are currently being verified by our compliance team.'}
+                    ? 'আপনার ট্রেড লাইসেন্স ও এনআইডি ডকুমেন্ট সফলভাবে জমা হয়েছে। অ্যাডমিন টিম যাচাই করে অনুমোদন দিলেই পণ্য পোস্ট ও বিড করতে পারবেন।'
+                    : 'Your trade documents and NID details have been submitted. Our compliance team is verifying your application. Once approved, you will have full access to list products and submit bids.'}
                 </div>
               </div>
             </div>
@@ -1053,6 +1107,167 @@ export default function SellerDashboard({
               }}
             >
               {currentLang === 'bn' ? 'ডকুমেন্ট দেখুন' : 'View Submitted Documents'}
+            </button>
+          </div>
+        ) : isSuspended ? (
+          <div style={{
+            background: '#FAF5FF',
+            border: '1.5px solid #9333EA',
+            borderRadius: '14px',
+            padding: '16px 20px',
+            marginBottom: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '14px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '10px',
+                background: '#F3E8FF',
+                color: '#7E22CE',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '22px',
+                flexShrink: 0
+              }}>
+                ⏸
+              </div>
+              <div>
+                <div style={{ fontSize: '15px', fontWeight: 800, color: '#6B21A8', marginBottom: '2px' }}>
+                  {currentLang === 'bn' ? 'অ্যাকাউন্ট সাময়িকভাবে স্থগিত রয়েছে' : 'Supplier Account Temporarily Suspended'}
+                </div>
+                <div style={{ fontSize: '13px', color: '#7E22CE', lineHeight: 1.4 }}>
+                  {currentSeller.suspendedUntil ? `Suspension active until: ${new Date(currentSeller.suspendedUntil).toLocaleDateString()}. ` : ''}
+                  {currentSeller.suspensionReason ? `Reason: "${currentSeller.suspensionReason}". ` : ''}
+                  {currentLang === 'bn' ? 'স্থগিতকালীন সময়ে নতুন পণ্য তালিকাভুক্তকরণ ও বিডিং বন্ধ থাকবে।' : 'New catalog listings and quotation bidding are paused during suspension.'}
+                </div>
+              </div>
+            </div>
+            <a
+              href="mailto:support@packbang.com"
+              style={{
+                background: '#7E22CE',
+                color: '#FFFFFF',
+                textDecoration: 'none',
+                padding: '9px 18px',
+                borderRadius: '8px',
+                fontWeight: 700,
+                fontSize: '13px'
+              }}
+            >
+              Contact Support
+            </a>
+          </div>
+        ) : isBanned ? (
+          <div style={{
+            background: '#FEF2F2',
+            border: '1.5px solid #EF4444',
+            borderRadius: '14px',
+            padding: '16px 20px',
+            marginBottom: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '14px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '10px',
+                background: '#FEE2E2',
+                color: '#DC2626',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '22px',
+                flexShrink: 0
+              }}>
+                🚫
+              </div>
+              <div>
+                <div style={{ fontSize: '15px', fontWeight: 800, color: '#991B1B', marginBottom: '2px' }}>
+                  {currentLang === 'bn' ? 'অ্যাকাউন্ট চিরতরে ব্যান করা হয়েছে' : 'Supplier Account Permanently Banned'}
+                </div>
+                <div style={{ fontSize: '13px', color: '#B91C1C', lineHeight: 1.4 }}>
+                  {currentSeller.banReason ? `Reason: "${currentSeller.banReason}". ` : ''}
+                  {currentLang === 'bn' ? 'সকল বাণিজ্যিক সুবিধা বাতিল করা হয়েছে।' : 'All supplier privileges have been permanently revoked.'}
+                </div>
+              </div>
+            </div>
+            <a
+              href="mailto:support@packbang.com"
+              style={{
+                background: '#DC2626',
+                color: '#FFFFFF',
+                textDecoration: 'none',
+                padding: '9px 18px',
+                borderRadius: '8px',
+                fontWeight: 700,
+                fontSize: '13px'
+              }}
+            >
+              Appeal to Support
+            </a>
+          </div>
+        ) : isRejected ? (
+          <div style={{
+            background: '#FEF2F2',
+            border: '1.5px solid #F87171',
+            borderRadius: '14px',
+            padding: '16px 20px',
+            marginBottom: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '14px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '10px',
+                background: '#FEE2E2',
+                color: '#DC2626',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '22px',
+                flexShrink: 0
+              }}>
+                ✕
+              </div>
+              <div>
+                <div style={{ fontSize: '15px', fontWeight: 800, color: '#991B1B', marginBottom: '2px' }}>
+                  {currentLang === 'bn' ? 'আবেদন বাতিল করা হয়েছে' : 'Supplier Verification Application Rejected'}
+                </div>
+                <div style={{ fontSize: '13px', color: '#B91C1C', lineHeight: 1.4 }}>
+                  {currentSeller.rejectionReason ? `Reason: "${currentSeller.rejectionReason}". ` : ''}
+                  {currentLang === 'bn' ? 'অনুগ্রহ করে সঠিক ট্রেড লাইসেন্স বা এনআইডি আপলোড করে পুনরায় জমা দিন।' : 'Please review and re-upload the correct documents in Tab 4 to resubmit for approval.'}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => setActiveTab('settings')}
+              style={{
+                background: '#DC2626',
+                color: '#FFFFFF',
+                border: 'none',
+                padding: '9px 18px',
+                borderRadius: '8px',
+                fontWeight: 700,
+                fontSize: '13px',
+                cursor: 'pointer'
+              }}
+            >
+              {currentLang === 'bn' ? 'সংশোধন করে জমা দিন →' : 'Update & Resubmit →'}
             </button>
           </div>
         ) : null}
@@ -1735,17 +1950,25 @@ export default function SellerDashboard({
 
               {/* Status Header Banner */}
               <div style={{
-                background: currentSeller.kycStatus === 'verified'
+                background: isApproved
                   ? '#ECFDF5'
-                  : currentSeller.kycStatus === 'pending_verification'
-                    ? '#EFF6FF'
-                    : '#FFFBEB',
+                  : isSuspended
+                    ? '#FAF5FF'
+                    : isBanned
+                      ? '#FEF2F2'
+                      : isRejected
+                        ? '#FEF2F2'
+                        : '#EFF6FF',
                 border: `1.5px solid ${
-                  currentSeller.kycStatus === 'verified'
+                  isApproved
                     ? '#10B981'
-                    : currentSeller.kycStatus === 'pending_verification'
-                      ? '#3B82F6'
-                      : '#F59E0B'
+                    : isSuspended
+                      ? '#9333EA'
+                      : isBanned
+                        ? '#EF4444'
+                        : isRejected
+                          ? '#F87171'
+                          : '#3B82F6'
                 }`,
                 borderRadius: '14px',
                 padding: '20px 24px',
@@ -1762,14 +1985,18 @@ export default function SellerDashboard({
                       borderRadius: '12px',
                       fontSize: '12px',
                       fontWeight: 800,
-                      background: currentSeller.kycStatus === 'verified' ? '#059669' : currentSeller.kycStatus === 'pending_verification' ? '#2563EB' : '#D97706',
+                      background: isApproved ? '#059669' : isSuspended ? '#7E22CE' : isBanned ? '#991B1B' : isRejected ? '#DC2626' : '#2563EB',
                       color: '#FFFFFF'
                     }}>
-                      {currentSeller.kycStatus === 'verified'
-                        ? '✓ VERIFIED SUPPLIER'
-                        : currentSeller.kycStatus === 'pending_verification'
-                          ? '⏳ VERIFICATION UNDER REVIEW'
-                          : '⚠️ KYC ACTION REQUIRED'}
+                      {isApproved
+                        ? '✓ APPROVED SUPPLIER'
+                        : isSuspended
+                          ? '⏸ ACCOUNT SUSPENDED'
+                          : isBanned
+                            ? '🚫 ACCOUNT BANNED'
+                            : isRejected
+                              ? '✕ APPLICATION REJECTED'
+                              : '⏳ PENDING ADMIN APPROVAL'}
                     </span>
                     <span style={{ fontSize: '13px', color: '#64748B' }}>
                       Seller ID: {currentSeller.id}
@@ -1780,9 +2007,19 @@ export default function SellerDashboard({
                   </h3>
                   <p style={{ margin: 0, fontSize: '13px', color: '#475569' }}>
                     {currentLang === 'bn'
-                      ? 'অ্যাকাউন্ট তৈরির পর সেলারের নাম, ট্রেড লাইসেন্স এবং জাতীয় পরিচয়পত্রের (NID) উভয় অংশ জমা দেওয়া বাধ্যতামূলক।'
-                      : 'Seller Legal Name, Trade License, and National ID (Front & Back parts) are strictly required for supplier verification.'}
+                      ? 'অ্যাকাউন্ট তৈরির পর সেলারের নাম, ট্রেড লাইসেন্স এবং জাতীয় পরিচয়পত্রের (NID) উভয় অংশ জমা দিলে অ্যাডমিন যাচাই করে অনুমোদন দেন।'
+                      : 'When you submit your Seller Name, Trade License, and National ID (Front & Back), an approval request is sent to Admin for review.'}
                   </p>
+                  {isRejected && currentSeller.rejectionReason && (
+                    <div style={{ marginTop: '10px', padding: '10px 14px', background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '8px', fontSize: '13px', color: '#991B1B', fontWeight: 700 }}>
+                      ⚠️ Admin Rejection Notice: "{currentSeller.rejectionReason}". Please update the required document below and resubmit.
+                    </div>
+                  )}
+                  {isSuspended && (
+                    <div style={{ marginTop: '10px', padding: '10px 14px', background: '#F3E8FF', border: '1px solid #E9D5FF', borderRadius: '8px', fontSize: '13px', color: '#6B21A8', fontWeight: 700 }}>
+                      ⏸ Admin Suspension: Suspended until {currentSeller.suspendedUntil ? new Date(currentSeller.suspendedUntil).toLocaleDateString() : 'notice'}. Reason: "{currentSeller.suspensionReason || 'Compliance review'}".
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2410,7 +2647,7 @@ export default function SellerDashboard({
                     gap: '8px'
                   }}
                 >
-                  {isSavingProfile ? '⏳ Saving Documents...' : '💾 Save & Submit Verification Documents'}
+                  {isSavingProfile ? '⏳ Saving Documents...' : isRejected ? '🔄 Resubmit for Admin Approval' : isPendingApproval ? '💾 Update Submitted Documents' : '💾 Save & Submit for Verification'}
                 </button>
               </div>
 
