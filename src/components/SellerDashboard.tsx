@@ -642,29 +642,49 @@ export default function SellerDashboard({
     e.preventDefault();
     if (!bidModalItem || !bidAmount) return;
 
+    if (!hasRequiredKyc) {
+      showToast(currentLang === 'bn' ? 'কাস্টম অর্ডারে বিড করতে ট্রেড লাইসেন্স ও এনআইডি জমা দেওয়া আবশ্যক।' : 'Custom order bidding requires Trade License and National ID verification.');
+      setBidModalItem(null);
+      setActiveTab('settings');
+      return;
+    }
+
     setIsSubmittingBid(true);
     const amountNum = parseFloat(bidAmount);
 
     try {
-      await fetch(`${storeApiUrl}/api/public/custom-order/${bidModalItem.id}/bid`, {
+      const res = await fetch(`${storeApiUrl}/api/public/custom-order/${bidModalItem.id}/bid`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sellerId: currentSeller.id || ('SELLER-' + (currentSeller.phone || Date.now())),
+          sellerPhone: currentSeller.phone,
           sellerName: currentSeller.shopName || 'Verified Packaging Supplier',
           amount: amountNum,
           deliveryTime: '3-5 Days',
           note: `Factory quotation from ${currentSeller.shopName || 'packaging manufacturer'}`
         })
       });
-    } catch (err) {
-      console.warn('Bid submission sync note:', err);
-    } finally {
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.requiresKyc) {
+          showToast(currentLang === 'bn' ? 'কাস্টম অর্ডারে বিড করতে আপনার ট্রেড লাইসেন্স ও এনআইডি তথ্য আপডেট করুন।' : (data.error || 'KYC verification required to bid on custom orders.'));
+          setBidModalItem(null);
+          setActiveTab('settings');
+          return;
+        }
+        showToast(data.error || 'Failed to submit bid');
+        return;
+      }
       setBids(bids.map(b => b.id === bidModalItem.id ? { ...b, bidPlaced: amountNum } : b));
       setBidModalItem(null);
       setBidAmount('');
-      setIsSubmittingBid(false);
       showToast(currentLang === 'bn' ? 'পাইকারি অর্ডারে আপনার কোটেশন জমা হয়েছে!' : 'Wholesale quotation bid submitted successfully!');
+    } catch (err) {
+      console.warn('Bid submission error:', err);
+      showToast('Network error submitting bid. Please try again.');
+    } finally {
+      setIsSubmittingBid(false);
     }
   };
 
@@ -946,34 +966,24 @@ export default function SellerDashboard({
           <div style={{ display: 'flex', gap: '10px' }}>
             <button
               onClick={() => {
-                if (!hasRequiredKyc) {
-                  showToast(currentLang === 'bn' ? 'অনুগ্রহ করে প্রথমে আপনার ট্রেড লাইসেন্স ও এনআইডি জমা দিন।' : 'Please complete your Trade License and NID verification in Tab 4 first.');
-                  setActiveTab('settings');
-                } else if (!isApproved) {
-                  if (isPendingApproval) {
-                    showToast(currentLang === 'bn' ? 'আপনার অ্যাকাউন্ট অ্যাডমিন অনুমোদনের অপেক্ষায় রয়েছে। অনুমোদনের পর পণ্য যোগ করতে পারবেন।' : 'Your account is pending admin approval. You can post products after admin approval.');
-                  } else if (isSuspended) {
-                    showToast(currentLang === 'bn' ? 'অ্যাকাউন্ট স্থগিত রয়েছে। নতুন পণ্য যোগ করা সম্ভব নয়।' : 'Account is currently suspended. You cannot add products during suspension.');
-                  } else if (isRejected) {
-                    showToast(currentLang === 'bn' ? 'আবেদন বাতিল হয়েছে। অনুগ্রহ করে প্রোফাইল আপডেট করুন।' : 'Application was rejected. Please update documents in Tab 4 to resubmit.');
-                    setActiveTab('settings');
-                  } else if (isBanned) {
-                    showToast(currentLang === 'bn' ? 'অ্যাকাউন্ট চিরতরে ব্যান করা হয়েছে।' : 'Account permanently banned.');
-                  }
+                if (isSuspended) {
+                  showToast(currentLang === 'bn' ? 'অ্যাকাউন্ট সাময়িকভাবে স্থগিত রয়েছে। নতুন পণ্য যোগ করা সম্ভব নয়।' : 'Account is currently suspended. You cannot add products during suspension.');
+                } else if (isBanned) {
+                  showToast(currentLang === 'bn' ? 'অ্যাকাউন্ট স্থায়ীভাবে বন্ধ রয়েছে।' : 'Account is permanently banned.');
                 } else {
                   setShowAddModal(true);
                 }
               }}
               style={{
-                background: isApproved ? '#FF5A1F' : '#64748B',
+                background: (!isSuspended && !isBanned) ? '#FF5A1F' : '#64748B',
                 color: '#fff',
                 border: 'none',
                 padding: '12px 20px',
                 borderRadius: '10px',
                 fontWeight: 700,
                 fontSize: '14px',
-                cursor: 'pointer',
-                boxShadow: isApproved ? '0 4px 14px rgba(255, 90, 31, 0.4)' : 'none'
+                cursor: (!isSuspended && !isBanned) ? 'pointer' : 'not-allowed',
+                boxShadow: (!isSuspended && !isBanned) ? '0 4px 14px rgba(255, 90, 31, 0.4)' : 'none'
               }}
             >
               + {currentLang === 'bn' ? 'প্যাকেজিং পণ্য যোগ করুন' : 'Add Packaging Item'}
@@ -1023,16 +1033,16 @@ export default function SellerDashboard({
                 fontSize: '22px',
                 flexShrink: 0
               }}>
-                ⚠️
+                ⚡
               </div>
               <div>
                 <div style={{ fontSize: '15px', fontWeight: 800, color: '#92400E', marginBottom: '2px' }}>
-                  {currentLang === 'bn' ? 'কেওয়াইসি তথ্য বাকি রয়েছে' : 'Action Required: Incomplete Verification Documents'}
+                  {currentLang === 'bn' ? 'পণ্য বিক্রি সক্রিয় — কাস্টম বিডের জন্য কেওয়াইসি তথ্য দিন' : 'Product Sales Active — Complete KYC for Custom Order Bidding'}
                 </div>
                 <div style={{ fontSize: '13px', color: '#B45309', lineHeight: 1.4 }}>
                   {currentLang === 'bn'
-                    ? 'অ্যাকাউন্ট তৈরির পর সেলার নাম, ট্রেড লাইসেন্স এবং এনআইডি (উভয় অংশ) জমা দেওয়া আবশ্যক।'
-                    : 'Please provide your Seller Legal Name, Trade License, and National ID (Front & Back parts) to send your approval request to admin.'}
+                    ? 'আপনার সাধারণ প্যাকেজিং পণ্য বিক্রি চালু আছে। তবে কাস্টম ম্যানুফ্যাকচারিং অর্ডারে কোটেশন/বিড দিতে ট্রেড লাইসেন্স ও এনআইডি জমা দিন।'
+                    : 'You can sell ready-stock packaging items immediately. To bid on wholesale custom orders, please provide your Trade License and National ID.'}
                 </div>
               </div>
             </div>
@@ -1051,7 +1061,7 @@ export default function SellerDashboard({
                 boxShadow: '0 2px 8px rgba(217, 119, 6, 0.25)'
               }}
             >
-              {currentLang === 'bn' ? 'এখনই তথ্য জমা দিন →' : 'Complete Profile Documents →'}
+              {currentLang === 'bn' ? 'কেওয়াইসি সম্পন্ন করুন →' : 'Complete KYC to Bid →'}
             </button>
           </div>
         ) : isPendingApproval ? (
@@ -1084,12 +1094,12 @@ export default function SellerDashboard({
               </div>
               <div>
                 <div style={{ fontSize: '15px', fontWeight: 800, color: '#1E40AF', marginBottom: '2px' }}>
-                  {currentLang === 'bn' ? 'অ্যাডমিন অনুমোদনের অপেক্ষায় রয়েছে' : 'Account Under Admin Review & Verification'}
+                  {currentLang === 'bn' ? 'কেওয়াইসি যাচাই প্রক্রিয়াধীন রয়েছে' : 'KYC Verification Under Review'}
                 </div>
                 <div style={{ fontSize: '13px', color: '#1D4ED8', lineHeight: 1.4 }}>
                   {currentLang === 'bn'
-                    ? 'আপনার ট্রেড লাইসেন্স ও এনআইডি ডকুমেন্ট সফলভাবে জমা হয়েছে। অ্যাডমিন টিম যাচাই করে অনুমোদন দিলেই পণ্য পোস্ট ও বিড করতে পারবেন।'
-                    : 'Your trade documents and NID details have been submitted. Our compliance team is verifying your application. Once approved, you will have full access to list products and submit bids.'}
+                    ? 'আপনার ট্রেড লাইসেন্স ও এনআইডি সফলভাবে জমা হয়েছে। অ্যাডমিন টিম যাচাই সম্পন্ন করলে আপনি কাস্টম অর্ডারে বিড করতে পারবেন। আপনার পণ্য বিক্রি চালু আছে।'
+                    : 'Your Trade License and NID details have been submitted. Once verified, you can place bids on wholesale custom orders. Your catalog selling remains active.'}
                 </div>
               </div>
             </div>
@@ -1821,6 +1831,51 @@ export default function SellerDashboard({
         {/* TAB 3: CUSTOM WHOLESALE BIDS */}
         {activeTab === 'bids' && (
           <div>
+            {!hasRequiredKyc && (
+              <div style={{
+                background: '#FFFBEB',
+                border: '1.5px solid #F59E0B',
+                borderRadius: '12px',
+                padding: '14px 18px',
+                marginBottom: '18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ fontSize: '20px' }}>⚠️</span>
+                  <div>
+                    <strong style={{ color: '#92400E', fontSize: '14px', display: 'block' }}>
+                      {currentLang === 'bn' ? 'কাস্টম অর্ডারে বিড করার জন্য কেওয়াইসি প্রয়োজন' : 'Custom Order Bidding Requires KYC Verification'}
+                    </strong>
+                    <span style={{ color: '#B45309', fontSize: '13px' }}>
+                      {currentLang === 'bn'
+                        ? 'আপনার সাধারণ প্যাকেজিং পণ্য বিক্রি চালু আছে। তবে কাস্টম প্রোডাকশন অর্ডারে কোটেশন দিতে ট্রেড লাইসেন্স ও জাতীয় পরিচয়পত্র (উভয় অংশ) জমা দিন।'
+                        : 'Your ready-stock catalog selling is active. To submit quotation bids on custom manufacturing orders, please submit your Trade License and National ID (both sides).'}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('settings')}
+                  style={{
+                    background: '#D97706',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  {currentLang === 'bn' ? 'কেওয়াইসি আপডেট করুন →' : 'Update KYC Now →'}
+                </button>
+              </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
               <div>
                 <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1920,9 +1975,17 @@ export default function SellerDashboard({
                       </div>
                     ) : (
                       <button
-                        onClick={() => { setBidModalItem(b); setBidAmount(''); }}
+                        onClick={() => {
+                          if (!hasRequiredKyc) {
+                            showToast(currentLang === 'bn' ? 'কাস্টম অর্ডারে বিড করতে ফ্যাক্টরি প্রোফাইলে ট্রেড লাইসেন্স ও এনআইডি জমা দিন।' : 'Bidding on custom orders requires Trade License and NID verification. Please update KYC in Tab 4.');
+                            setActiveTab('settings');
+                            return;
+                          }
+                          setBidModalItem(b);
+                          setBidAmount('');
+                        }}
                         style={{
-                          background: '#FF5A1F',
+                          background: hasRequiredKyc ? '#FF5A1F' : '#D97706',
                           color: '#FFFFFF',
                           border: 'none',
                           padding: '10px 20px',
@@ -1930,10 +1993,17 @@ export default function SellerDashboard({
                           fontWeight: 700,
                           fontSize: '13px',
                           cursor: 'pointer',
-                          boxShadow: '0 4px 12px rgba(255, 90, 31, 0.3)'
+                          boxShadow: hasRequiredKyc ? '0 4px 12px rgba(255, 90, 31, 0.3)' : '0 4px 12px rgba(217, 119, 6, 0.25)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px'
                         }}
                       >
-                        ⚡ Submit Factory Bid
+                        {hasRequiredKyc ? (
+                          <>⚡ {currentLang === 'bn' ? 'ফ্যাক্টরি বিড দিন' : 'Submit Factory Bid'}</>
+                        ) : (
+                          <>🔒 {currentLang === 'bn' ? 'কেওয়াইসি দিয়ে বিড করুন' : 'Update KYC to Bid'}</>
+                        )}
                       </button>
                     )}
                   </div>
@@ -2007,8 +2077,8 @@ export default function SellerDashboard({
                   </h3>
                   <p style={{ margin: 0, fontSize: '13px', color: '#475569' }}>
                     {currentLang === 'bn'
-                      ? 'অ্যাকাউন্ট তৈরির পর সেলারের নাম, ট্রেড লাইসেন্স এবং জাতীয় পরিচয়পত্রের (NID) উভয় অংশ জমা দিলে অ্যাডমিন যাচাই করে অনুমোদন দেন।'
-                      : 'When you submit your Seller Name, Trade License, and National ID (Front & Back), an approval request is sent to Admin for review.'}
+                      ? 'রেজিস্ট্রেশন সম্পন্ন হলেই সাধারণ প্যাকেজিং পণ্য বিক্রি চালু থাকে। কাস্টম ও পাইকারি অর্ডারে বিড করতে আপনার ট্রেড লাইসেন্স এবং এনআইডি (উভয় অংশ) জমা দিন।'
+                      : 'Product catalog selling is active immediately upon registration. To bid on wholesale custom orders, please provide your Trade License and National ID (Front & Back).'}
                   </p>
                   {isRejected && currentSeller.rejectionReason && (
                     <div style={{ marginTop: '10px', padding: '10px 14px', background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '8px', fontSize: '13px', color: '#991B1B', fontWeight: 700 }}>
