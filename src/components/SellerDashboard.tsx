@@ -121,6 +121,8 @@ export default function SellerDashboard({
   const [chatFilterWarning, setChatFilterWarning] = useState<string | null>(null);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [previewImageModal, setPreviewImageModal] = useState<{ url: string; title: string } | null>(null);
+  const [previewImageRotation, setPreviewImageRotation] = useState<number>(0);
 
   // Store API base URL for live marketplace sync
   const storeApiUrl = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
@@ -1994,6 +1996,33 @@ export default function SellerDashboard({
                       <span>Quantity: <strong style={{ color: '#0F172A' }}>{b.quantity.toLocaleString()} pcs</strong></span>
                       <span>Target Budget: <strong style={{ color: '#059669' }}>{b.targetBudget}</strong></span>
                     </div>
+
+                    {b.images && b.images.length > 0 && (
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
+                        {b.images.map((imgUrl, imgIdx) => (
+                          <div
+                            key={imgIdx}
+                            onClick={() => {
+                              setPreviewImageRotation(0);
+                              setPreviewImageModal({ url: imgUrl, title: `Reference Spec #${imgIdx + 1} - ${b.id}` });
+                            }}
+                            style={{
+                              width: '52px',
+                              height: '52px',
+                              borderRadius: '8px',
+                              overflow: 'hidden',
+                              border: '1.5px solid #CBD5E1',
+                              cursor: 'pointer',
+                              position: 'relative',
+                              background: '#F1F5F9'
+                            }}
+                            title="Click to preview reference specification"
+                          >
+                            <img src={imgUrl} alt={`Spec ${imgIdx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -2005,59 +2034,100 @@ export default function SellerDashboard({
                         <div style={{ fontSize: '18px', fontWeight: 900, color: '#FF5A1F' }}>
                           ৳ {b.bidPlaced.toFixed(2)} / pc
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => openSellerChat(b)}
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: '8px' }}>
+                          <a
+                            href={`${storeApiUrl}/custom-order/${b.id}?sellerId=${encodeURIComponent(currentSeller.id || currentSeller.phone || '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              background: '#0F172A',
+                              color: '#FFFFFF',
+                              textDecoration: 'none',
+                              padding: '6px 14px',
+                              borderRadius: '8px',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}
+                          >
+                            👁️ {currentLang === 'bn' ? 'বিস্তারিত দেখুন' : 'View Details'}
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => openSellerChat(b)}
+                            style={{
+                              background: '#EFF6FF',
+                              color: '#1D4ED8',
+                              border: '1px solid #BFDBFE',
+                              padding: '6px 14px',
+                              borderRadius: '8px',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}
+                          >
+                            💬 Chat with Customer
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <a
+                          href={`${storeApiUrl}/custom-order/${b.id}?sellerId=${encodeURIComponent(currentSeller.id || currentSeller.phone || '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
                           style={{
-                            marginTop: '8px',
-                            background: '#EFF6FF',
-                            color: '#1D4ED8',
-                            border: '1px solid #BFDBFE',
-                            padding: '6px 14px',
+                            background: '#0F172A',
+                            color: '#FFFFFF',
+                            textDecoration: 'none',
+                            padding: '10px 16px',
                             borderRadius: '8px',
-                            fontSize: '12px',
+                            fontSize: '13px',
                             fontWeight: 700,
-                            cursor: 'pointer',
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '6px'
                           }}
                         >
-                          💬 Chat with Customer
+                          👁️ {currentLang === 'bn' ? 'বিস্তারিত দেখুন' : 'View Details'}
+                        </a>
+                        <button
+                          onClick={() => {
+                            if (!hasRequiredKyc) {
+                              showToast(currentLang === 'bn' ? 'কাস্টম অর্ডারে বিড করতে ফ্যাক্টরি প্রোফাইলে ট্রেড লাইসেন্স ও এনআইডি জমা দিন।' : 'Bidding on custom orders requires Trade License and NID verification. Please update KYC in Tab 4.');
+                              setActiveTab('settings');
+                              return;
+                            }
+                            setBidModalItem(b);
+                            setBidAmount('');
+                          }}
+                          style={{
+                            background: hasRequiredKyc ? '#FF5A1F' : '#D97706',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            padding: '10px 20px',
+                            borderRadius: '8px',
+                            fontWeight: 700,
+                            fontSize: '13px',
+                            cursor: 'pointer',
+                            boxShadow: hasRequiredKyc ? '0 4px 12px rgba(255, 90, 31, 0.3)' : '0 4px 12px rgba(217, 119, 6, 0.25)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          {hasRequiredKyc ? (
+                            <>⚡ {currentLang === 'bn' ? 'ফ্যাক্টরি বিড দিন' : 'Submit Factory Bid'}</>
+                          ) : (
+                            <>🔒 {currentLang === 'bn' ? 'কেওয়াইসি দিয়ে বিড করুন' : 'Update KYC to Bid'}</>
+                          )}
                         </button>
                       </div>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          if (!hasRequiredKyc) {
-                            showToast(currentLang === 'bn' ? 'কাস্টম অর্ডারে বিড করতে ফ্যাক্টরি প্রোফাইলে ট্রেড লাইসেন্স ও এনআইডি জমা দিন।' : 'Bidding on custom orders requires Trade License and NID verification. Please update KYC in Tab 4.');
-                            setActiveTab('settings');
-                            return;
-                          }
-                          setBidModalItem(b);
-                          setBidAmount('');
-                        }}
-                        style={{
-                          background: hasRequiredKyc ? '#FF5A1F' : '#D97706',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          padding: '10px 20px',
-                          borderRadius: '8px',
-                          fontWeight: 700,
-                          fontSize: '13px',
-                          cursor: 'pointer',
-                          boxShadow: hasRequiredKyc ? '0 4px 12px rgba(255, 90, 31, 0.3)' : '0 4px 12px rgba(217, 119, 6, 0.25)',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px'
-                        }}
-                      >
-                        {hasRequiredKyc ? (
-                          <>⚡ {currentLang === 'bn' ? 'ফ্যাক্টরি বিড দিন' : 'Submit Factory Bid'}</>
-                        ) : (
-                          <>🔒 {currentLang === 'bn' ? 'কেওয়াইসি দিয়ে বিড করুন' : 'Update KYC to Bid'}</>
-                        )}
-                      </button>
                     )}
                   </div>
                 </div>
@@ -3380,6 +3450,141 @@ export default function SellerDashboard({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Universal Specification Image Preview Modal */}
+      {previewImageModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(15, 23, 42, 0.85)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 999999,
+            padding: '20px',
+            boxSizing: 'border-box'
+          }}
+          onClick={() => setPreviewImageModal(null)}
+        >
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '16px',
+              padding: '20px 24px',
+              width: '100%',
+              maxWidth: '820px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
+              boxSizing: 'border-box',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #F1F5F9', paddingBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '20px' }}>🖼️</span>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#0F172A' }}>
+                  {previewImageModal.title || 'Packaging Specification Preview'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewImageModal(null)}
+                style={{
+                  background: '#F1F5F9',
+                  border: 'none',
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '50%',
+                  fontSize: '1.25rem',
+                  cursor: 'pointer',
+                  color: '#475569',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div
+              style={{
+                textAlign: 'center',
+                background: '#0F172A',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                maxHeight: '70vh',
+                minHeight: '250px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1px solid #334155'
+              }}
+            >
+              <img
+                src={previewImageModal.url}
+                alt="Specification Preview"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '70vh',
+                  objectFit: 'contain',
+                  transform: `rotate(${previewImageRotation}deg)`,
+                  transition: 'transform 0.2s ease'
+                }}
+              />
+            </div>
+
+            <div style={{ marginTop: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <span style={{ fontSize: '13px', color: '#64748B' }}>
+                ℹ️ High-resolution specification blueprint / reference sample
+              </span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setPreviewImageRotation(prev => (prev + 90) % 360)}
+                  style={{
+                    background: '#F1F5F9',
+                    color: '#334155',
+                    border: '1px solid #CBD5E1',
+                    padding: '6px 14px',
+                    borderRadius: '6px',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🔄 Rotate
+                </button>
+                <a
+                  href={previewImageModal.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    background: '#0F172A',
+                    color: '#FFFFFF',
+                    textDecoration: 'none',
+                    padding: '6px 16px',
+                    borderRadius: '6px',
+                    fontWeight: 700,
+                    fontSize: '13px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  ↗ Open Full Original
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       )}
