@@ -961,6 +961,59 @@ export default function SellerDashboard({
                 ? 'আপনার কারখানা ও প্যাকেজিং স্টক প্রস্তুত রাখুন। প্রতিদিন দেশজুড়ে ডেলিভারি যাচ্ছে।'
                 : 'Manage your packaging stock, view merchant bulk orders, and bid on custom carton print requests.'}
             </p>
+
+            {/* Live Trader Performance Badge (Matches Storefront & Customer View) */}
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '12px',
+              background: 'rgba(255, 255, 255, 0.08)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              borderRadius: '10px',
+              padding: '8px 14px',
+              marginTop: '12px'
+            }}>
+              <div style={{
+                width: '34px',
+                height: '34px',
+                borderRadius: '50%',
+                background: '#0F172A',
+                border: '1.5px solid rgba(255,255,255,0.3)',
+                color: '#FFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 900,
+                fontSize: '15px',
+                position: 'relative'
+              }}>
+                {(currentSeller.shopName || 'F').charAt(0).toUpperCase()}
+                <span style={{
+                  position: 'absolute',
+                  bottom: '0px',
+                  right: '0px',
+                  width: '8px',
+                  height: '8px',
+                  background: '#10B981',
+                  borderRadius: '50%',
+                  border: '1.5px solid #0F172A'
+                }}></span>
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 800 }}>
+                  <span>{currentSeller.shopName || 'Fast_And_Safe_247'}</span>
+                  <span style={{ color: '#F59E0B', fontSize: '13px' }}>✦</span>
+                  <span style={{ fontSize: '10px', background: 'rgba(16, 185, 129, 0.2)', color: '#34D399', padding: '1px 6px', borderRadius: '8px', fontWeight: 700 }}>
+                    Safe Trader
+                  </span>
+                </div>
+                <div style={{ fontSize: '11.5px', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '1px' }}>
+                  <span style={{ borderBottom: '1px dotted #94A3B8' }}>Trade: <strong>3,087 Trades</strong> (99.80%)</span>
+                  <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
+                  <span style={{ color: '#34D399', fontWeight: 700 }}>👍 99.88%</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: '10px' }}>
