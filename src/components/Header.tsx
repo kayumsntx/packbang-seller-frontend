@@ -10,6 +10,7 @@ interface HeaderProps {
 export default function Header({ currentLang, onLangChange, seller, onOpenDashboard }: HeaderProps) {
   const [solid, setSolid] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -35,15 +36,11 @@ export default function Header({ currentLang, onLangChange, seller, onOpenDashbo
 
             {/* Wordmark: packbang */}
             <text x="40" y="27" fontFamily="'Roboto', sans-serif" fontSize="22" fontWeight="900" fill="#07002F" letterSpacing="-0.5">packbang</text>
-
-            {/* Sub-badge: SELLER HUB */}
-            {/* <rect x="126" y="10" width="72" height="19" rx="3" fill="#FFF2EC"/>
-            <text x="130" y="23" fontFamily="'Roboto', sans-serif" fontSize="8.5" fontWeight="800" fill="#F85606">SELLER HUB</text> */}
           </svg>
         </a>
 
-        {/* Navigation & Utilities */}
-        <nav className="header-center-navs">
+        {/* Navigation & Utilities (Desktop) */}
+        <nav className="header-center-navs desktop-only-nav">
           <div className="header-center-navs-content">
             <a href="#support">
               <span>{currentLang === 'bn' ? 'প্যাকব্যাং একাডেমি' : 'Packaging Academy'}</span>
@@ -57,7 +54,7 @@ export default function Header({ currentLang, onLangChange, seller, onOpenDashbo
             </a>
           </div>
 
-          {/* Language Switcher */}
+          {/* Dashboard Button */}
           {seller && (
             <div className="header-center-navs-content">
               <button
@@ -125,7 +122,115 @@ export default function Header({ currentLang, onLangChange, seller, onOpenDashbo
             </div>
           </div>
         </nav>
+
+        {/* Mobile Header Actions */}
+        <div className="mobile-header-actions">
+          {seller && (
+            <button
+              type="button"
+              onClick={onOpenDashboard}
+              className="btn-mobile-dash"
+            >
+              📦 {currentLang === 'bn' ? 'ড্যাশবোর্ড' : 'Dashboard'}
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="mobile-header-hamburger"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle navigation menu"
+          >
+            {mobileMenuOpen ? '✕' : '☰'}
+          </button>
+        </div>
       </div>
+
+      {/* Mobile Slide-Out Navigation Drawer */}
+      {mobileMenuOpen && (
+        <div className="mobile-drawer-backdrop" onClick={() => setMobileMenuOpen(false)}>
+          <div className="mobile-drawer-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="mobile-drawer-top">
+              <span className="mobile-drawer-brand">PACKBANG SELLER</span>
+              <button 
+                type="button" 
+                className="mobile-drawer-close"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mobile-drawer-body">
+              {seller ? (
+                <div className="mobile-drawer-user-card">
+                  <div className="mobile-drawer-user-avatar">
+                    {(seller.shopName || 'S').charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="mobile-drawer-shop-name">{seller.shopName}</div>
+                    <div className="mobile-drawer-phone">{seller.phone}</div>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="mobile-drawer-links">
+                {seller && (
+                  <button
+                    type="button"
+                    onClick={() => { onOpenDashboard?.(); setMobileMenuOpen(false); }}
+                    className="mobile-drawer-link-btn"
+                  >
+                    📦 {currentLang === 'bn' ? 'সেলার ড্যাশবোর্ড' : 'Seller Dashboard'}
+                  </button>
+                )}
+                
+                <a 
+                  href="#support" 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="mobile-drawer-link"
+                >
+                  🎓 {currentLang === 'bn' ? 'প্যাকব্যাং একাডেমি' : 'Packaging Academy'}
+                </a>
+
+                <a 
+                  href="#faq" 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="mobile-drawer-link"
+                >
+                  ❓ {currentLang === 'bn' ? 'সাপোর্ট ও সাহায্য' : 'Help Center'}
+                </a>
+              </div>
+
+              <div className="mobile-drawer-footer">
+                <div className="mobile-drawer-lang-selector">
+                  <button
+                    type="button"
+                    className={`lang-pill ${currentLang === 'en' ? 'active' : ''}`}
+                    onClick={() => { onLangChange('en'); setMobileMenuOpen(false); }}
+                  >
+                    English
+                  </button>
+                  <button
+                    type="button"
+                    className={`lang-pill ${currentLang === 'bn' ? 'active' : ''}`}
+                    onClick={() => { onLangChange('bn'); setMobileMenuOpen(false); }}
+                  >
+                    বাংলা
+                  </button>
+                </div>
+                <div className="mobile-drawer-country">
+                  <svg viewBox="0 0 20 12" width="20" height="12" style={{ borderRadius: '2px' }}>
+                    <rect width="20" height="12" fill="#006A4E" />
+                    <circle cx="9" cy="6" r="4" fill="#F42A41" />
+                  </svg>
+                  <span>Bangladesh (BD)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

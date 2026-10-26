@@ -808,7 +808,7 @@ export default function SellerDashboard({
       )}
 
       {/* Top Navbar */}
-      <header style={{
+      <header className="seller-dashboard-header" style={{
         background: '#0F172A',
         color: '#FFFFFF',
         padding: '14px 28px',
@@ -917,7 +917,7 @@ export default function SellerDashboard({
       </header>
 
       {/* Dashboard Body */}
-      <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '24px 20px' }}>
+      <div className="seller-dashboard-body" style={{ maxWidth: '1280px', margin: '0 auto', padding: '24px 20px' }}>
 
         {/* Welcome Banner */}
         <div style={{
