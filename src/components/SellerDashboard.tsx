@@ -73,11 +73,15 @@ interface OrderItem {
 
 interface CustomBidRequest {
   id: string;
+  title?: string;
   buyer: string;
   location: string;
   requestText: string;
   quantity: number;
+  unit?: string;
+  unitPrice?: number;
   targetBudget: string;
+  targetBudgetRaw?: number;
   bidPlaced?: number;
   deadline?: string;
   images?: string[];
@@ -113,6 +117,12 @@ export default function SellerDashboard({
   const [showAddModal, setShowAddModal] = useState(false);
   const [bidModalItem, setBidModalItem] = useState<CustomBidRequest | null>(null);
   const [bidAmount, setBidAmount] = useState('');
+  const [bidDeliveryTime, setBidDeliveryTime] = useState('3-5 Working Days');
+  const [bidNote, setBidNote] = useState('');
+  const [bidTermsAccepted, setBidTermsAccepted] = useState(false);
+  const [showSellerTermsModal, setShowSellerTermsModal] = useState(false);
+  const [sellerTermsData, setSellerTermsData] = useState<{ title: string; content: string; updatedAt?: string } | null>(null);
+  const [isLoadingSellerTerms, setIsLoadingSellerTerms] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
   const [isLoadingBids, setIsLoadingBids] = useState(false);
   const [isSubmittingBid, setIsSubmittingBid] = useState(false);
@@ -191,14 +201,23 @@ export default function SellerDashboard({
           const existingBid = o.bids?.find(
             (b: any) => b.sellerId === currentSeller.id || b.sellerName === currentSeller.shopName
           );
+          const qty = Number(o.quantity) || 1;
+          const budgetNum = Number(o.budget) || 0;
+          const unitName = o.unit || 'Pcs';
+          const calculatedUnitRate = o.unitPrice || (budgetNum > 0 && qty > 0 ? Math.round((budgetNum / qty) * 100) / 100 : 0);
+
           return {
             id: o.id,
+            title: o.title || '',
             buyer: o.customerName || 'PackBang Customer',
-            location: o.customerPhone ? 'Verified Phone' : 'Bangladesh',
-            requestText: (o.title ? `${o.title} - ` : '') + (o.description || 'Custom packaging printing order'),
-            quantity: o.quantity || 1,
-            targetBudget: o.budget ? `৳ ${o.budget}` : 'Negotiable',
-            bidPlaced: existingBid ? existingBid.amount : undefined,
+            location: o.customerPhone ? 'Verified Buyer' : 'Bangladesh',
+            requestText: (o.title ? `${o.title} — ` : '') + (o.description || 'Custom packaging printing order'),
+            quantity: qty,
+            unit: unitName,
+            unitPrice: calculatedUnitRate,
+            targetBudget: budgetNum > 0 ? `৳ ${budgetNum.toLocaleString()}` : (o.budget ? `৳ ${o.budget}` : 'Negotiable'),
+            targetBudgetRaw: budgetNum,
+            bidPlaced: existingBid ? (existingBid.unitPrice || existingBid.amount) : undefined,
             deadline: o.deadline ? new Date(o.deadline).toLocaleDateString() : undefined,
             images: o.images || []
           };
@@ -647,6 +666,30 @@ export default function SellerDashboard({
     }
   };
 
+  const fetchAndOpenSellerTerms = async () => {
+    setShowSellerTermsModal(true);
+    if (!sellerTermsData) {
+      setIsLoadingSellerTerms(true);
+      try {
+        const res = await fetch(`${storeApiUrl}/api/terms?type=seller`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.terms) {
+            setSellerTermsData({
+              title: data.terms.title || 'Seller & Packaging Manufacturer Terms and Conditions',
+              content: data.terms.content || '',
+              updatedAt: data.terms.updatedAt
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Error fetching live seller terms:', err);
+      } finally {
+        setIsLoadingSellerTerms(false);
+      }
+    }
+  };
+
   const handlePlaceBid = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bidModalItem || !bidAmount) return;
@@ -658,8 +701,15 @@ export default function SellerDashboard({
       return;
     }
 
+    if (!bidTermsAccepted) {
+      showToast(currentLang === 'bn' ? 'কোটেশন জমা দিতে অনুগ্রহ করে সেলার ম্যানুফ্যাকচারিং শর্তাবলী স্বীকার করুন।' : 'Please accept the Seller Manufacturing Terms & Conditions to submit your quote.');
+      return;
+    }
+
     setIsSubmittingBid(true);
     const amountNum = parseFloat(bidAmount);
+    const qty = bidModalItem.quantity || 1;
+    const totalAmountVal = Math.round(amountNum * qty * 100) / 100;
 
     try {
       const res = await fetch(`${storeApiUrl}/api/public/custom-order/${bidModalItem.id}/bid`, {
@@ -667,11 +717,14 @@ export default function SellerDashboard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sellerId: currentSeller.id || ('SELLER-' + (currentSeller.phone || Date.now())),
-          sellerPhone: currentSeller.phone,
+          sellerPhone: currentSeller.phone || '',
           sellerName: currentSeller.shopName || 'Verified Packaging Supplier',
           amount: amountNum,
-          deliveryTime: '3-5 Days',
-          note: `Factory quotation from ${currentSeller.shopName || 'packaging manufacturer'}`
+          unitPrice: amountNum,
+          totalAmount: totalAmountVal,
+          deliveryTime: bidDeliveryTime || '3-5 Working Days',
+          note: bidNote.trim() || `Factory quotation from ${currentSeller.shopName || 'packaging manufacturer'}`,
+          termsAccepted: true
         })
       });
       const data = await res.json();
@@ -682,13 +735,15 @@ export default function SellerDashboard({
           setActiveTab('settings');
           return;
         }
-        showToast(data.error || 'Failed to submit bid');
+        showToast(data.message || data.error || 'Failed to submit quotation');
         return;
       }
       setBids(bids.map(b => b.id === bidModalItem.id ? { ...b, bidPlaced: amountNum } : b));
       setBidModalItem(null);
       setBidAmount('');
-      showToast(currentLang === 'bn' ? 'পাইকারি অর্ডারে আপনার কোটেশন জমা হয়েছে!' : 'Wholesale quotation bid submitted successfully!');
+      setBidNote('');
+      setBidTermsAccepted(false);
+      showToast(currentLang === 'bn' ? 'পাইকারি অর্ডারে আপনার আনুষ্ঠানিক ফ্যাক্টরি কোটেশন সফলভাবে জমা হয়েছে!' : 'Official wholesale factory quotation submitted successfully!');
     } catch (err) {
       console.warn('Bid submission error:', err);
       showToast('Network error submitting bid. Please try again.');
@@ -1983,26 +2038,49 @@ export default function SellerDashboard({
                   Online stores in Bangladesh are requesting bulk quotes. Submit your factory prices directly.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={fetchApprovedOrders}
-                disabled={isLoadingBids}
-                style={{
-                  background: '#EFF6FF',
-                  color: '#1D4ED8',
-                  border: '1px solid #BFDBFE',
-                  padding: '7px 14px',
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                🔄 {isLoadingBids ? (currentLang === 'bn' ? 'লোড হচ্ছে...' : 'Refreshing...') : (currentLang === 'bn' ? 'রিফ্রেশ করুন' : 'Refresh Requests')}
-              </button>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={fetchAndOpenSellerTerms}
+                  style={{
+                    background: '#FFF7ED',
+                    color: '#C2410C',
+                    border: '1.5px solid #FFEDD5',
+                    padding: '7px 14px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title="View Official Seller & Packaging Manufacturer Legal Terms"
+                >
+                  📜 {currentLang === 'bn' ? 'সেলার শর্তাবলী' : 'Seller Terms & Conditions'}
+                </button>
+                <button
+                  type="button"
+                  onClick={fetchApprovedOrders}
+                  disabled={isLoadingBids}
+                  style={{
+                    background: '#EFF6FF',
+                    color: '#1D4ED8',
+                    border: '1px solid #BFDBFE',
+                    padding: '7px 14px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  🔄 {isLoadingBids ? (currentLang === 'bn' ? 'লোড হচ্ছে...' : 'Refreshing...') : (currentLang === 'bn' ? 'রিফ্রেশ করুন' : 'Refresh Requests')}
+                </button>
+              </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -2033,7 +2111,7 @@ export default function SellerDashboard({
                     </p>
 
                     <div style={{ display: 'flex', gap: '16px', fontSize: '13px', color: '#64748B' }}>
-                      <span>Quantity: <strong style={{ color: '#0F172A' }}>{b.quantity.toLocaleString()} pcs</strong></span>
+                      <span>Quantity: <strong style={{ color: '#0F172A' }}>{b.quantity.toLocaleString()} {b.unit || 'pcs'}</strong></span>
                       <span>Target Budget: <strong style={{ color: '#059669' }}>{b.targetBudget}</strong></span>
                     </div>
 
@@ -2072,7 +2150,7 @@ export default function SellerDashboard({
                           ✓ Quotation Submitted
                         </div>
                         <div style={{ fontSize: '18px', fontWeight: 900, color: '#FF5A1F' }}>
-                          ৳ {b.bidPlaced.toFixed(2)} / pc
+                          ৳ {b.bidPlaced.toFixed(2)} / {b.unit || 'unit'}
                         </div>
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: '8px' }}>
                           <a
@@ -2144,7 +2222,10 @@ export default function SellerDashboard({
                               return;
                             }
                             setBidModalItem(b);
-                            setBidAmount('');
+                            setBidAmount(b.bidPlaced ? String(b.bidPlaced) : '');
+                            setBidDeliveryTime('3-5 Working Days');
+                            setBidNote('');
+                            setBidTermsAccepted(false);
                           }}
                           style={{
                             background: hasRequiredKyc ? '#FF5A1F' : '#D97706',
@@ -3677,68 +3758,610 @@ export default function SellerDashboard({
           </div>
         </div>
       )}
-{bidModalItem && (
+{bidModalItem && (() => {
+        const qty = bidModalItem.quantity || 1;
+        const unitName = bidModalItem.unit || 'Pcs';
+        const targetRate = bidModalItem.unitPrice || (bidModalItem.targetBudgetRaw && qty > 0 ? (bidModalItem.targetBudgetRaw / qty) : 0);
+        const enteredUnitVal = parseFloat(bidAmount);
+        const isValidVal = !isNaN(enteredUnitVal) && enteredUnitVal > 0;
+        const totalQuotationVal = isValidVal ? (enteredUnitVal * qty) : 0;
+        const rateDiffPercent = (targetRate > 0 && isValidVal) ? Math.round(((enteredUnitVal - targetRate) / targetRate) * 100) : null;
+
+        return (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px'
+          }}>
+            <div style={{
+              background: '#FFFFFF',
+              borderRadius: '20px',
+              width: '100%',
+              maxWidth: '620px',
+              maxHeight: '92vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              overflow: 'hidden',
+              border: '1px solid #E2E8F0'
+            }}>
+              {/* Modal Header */}
+              <div style={{
+                padding: '20px 24px 16px 24px',
+                borderBottom: '1px solid #F1F5F9',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                background: '#FFFFFF'
+              }}>
+                <div>
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: '#FFF7ED',
+                    color: '#C2410C',
+                    padding: '3px 10px',
+                    borderRadius: '20px',
+                    fontSize: '11px',
+                    fontWeight: 800,
+                    marginBottom: '6px',
+                    border: '1px solid #FFEDD5',
+                    letterSpacing: '0.3px'
+                  }}>
+                    <span>🏭</span> OFFICIAL FACTORY QUOTATION
+                  </div>
+                  <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#0F172A' }}>
+                    Submit Wholesale Quotation
+                  </h3>
+                  <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>
+                    Order ID: <strong style={{ color: '#1E293B' }}>{bidModalItem.id}</strong> • Open for Packaging Bids
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setBidModalItem(null)}
+                  style={{
+                    background: '#F1F5F9',
+                    border: 'none',
+                    width: '34px',
+                    height: '34px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#64748B',
+                    fontSize: '16px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#E2E8F0'; e.currentTarget.style.color = '#0F172A'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#F1F5F9'; e.currentTarget.style.color = '#64748B'; }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Scrollable Body */}
+              <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
+                {/* Buyer Specifications Card */}
+                <div style={{
+                  background: '#F8FAFC',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '14px',
+                  padding: '16px',
+                  marginBottom: '20px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '18px' }}>👤</span>
+                      <strong style={{ fontSize: '14px', color: '#0F172A' }}>{bidModalItem.buyer}</strong>
+                      <span style={{ fontSize: '11px', background: '#DCFCE7', color: '#15803D', padding: '1px 8px', borderRadius: '12px', fontWeight: 700 }}>
+                        ✓ {bidModalItem.location}
+                      </span>
+                    </div>
+                    {bidModalItem.deadline && (
+                      <span style={{ fontSize: '12px', color: '#64748B' }}>
+                        ⏳ Needed By: <strong style={{ color: '#0F172A' }}>{bidModalItem.deadline}</strong>
+                      </span>
+                    )}
+                  </div>
+
+                  <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: '#334155', lineHeight: '1.5', fontStyle: 'italic' }}>
+                    "{bidModalItem.requestText}"
+                  </p>
+
+                  {/* 4-Metric Badges Grid */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(115px, 1fr))',
+                    gap: '10px'
+                  }}>
+                    <div style={{ background: '#FFFFFF', padding: '10px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+                      <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Requested Volume</div>
+                      <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>
+                        {qty.toLocaleString()} {unitName}
+                      </div>
+                    </div>
+
+                    <div style={{ background: '#FFFFFF', padding: '10px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+                      <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Target Budget</div>
+                      <div style={{ fontSize: '14px', fontWeight: 800, color: '#059669' }}>
+                        {bidModalItem.targetBudget}
+                      </div>
+                    </div>
+
+                    <div style={{ background: '#FFFFFF', padding: '10px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+                      <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Benchmark Rate</div>
+                      <div style={{ fontSize: '14px', fontWeight: 800, color: '#3B82F6' }}>
+                        {targetRate > 0 ? `৳ ${targetRate.toFixed(2)} / ${unitName.toLowerCase()}` : 'Negotiable'}
+                      </div>
+                    </div>
+
+                    <div style={{ background: '#FFFFFF', padding: '10px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+                      <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Payment Terms</div>
+                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#7C3AED' }}>
+                        100% Escrow
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Spec Reference Images Thumbnails */}
+                  {bidModalItem.images && bidModalItem.images.length > 0 && (
+                    <div style={{ marginTop: '12px', borderTop: '1px dashed #CBD5E1', paddingTop: '10px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', marginBottom: '6px' }}>
+                        Buyer Reference Specifications ({bidModalItem.images.length}):
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {bidModalItem.images.map((img, i) => (
+                          <div
+                            key={i}
+                            onClick={() => {
+                              setPreviewImageRotation(0);
+                              setPreviewImageModal({ url: img, title: `Reference Spec #${i + 1} - ${bidModalItem.id}` });
+                            }}
+                            style={{
+                              width: '48px',
+                              height: '48px',
+                              borderRadius: '8px',
+                              border: '1.5px solid #CBD5E1',
+                              overflow: 'hidden',
+                              cursor: 'pointer',
+                              background: '#fff'
+                            }}
+                            title="Click to zoom spec photo"
+                          >
+                            <img src={img} alt="Spec" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Form Fields */}
+                <form id="wholesaleBidForm" onSubmit={handlePlaceBid}>
+                  {/* Price per Unit Input */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A' }}>
+                        Your Factory Price Per Unit (৳ / {unitName}) *
+                      </label>
+                      {rateDiffPercent !== null && (
+                        <span style={{
+                          fontSize: '11px',
+                          fontWeight: 800,
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                          background: rateDiffPercent <= 0 ? '#ECFDF5' : '#FFFBEB',
+                          color: rateDiffPercent <= 0 ? '#059669' : '#D97706',
+                          border: rateDiffPercent <= 0 ? '1px solid #A7F3D0' : '1px solid #FDE68A'
+                        }}>
+                          {rateDiffPercent <= 0
+                            ? `✓ Competitive (${Math.abs(rateDiffPercent)}% below budget)`
+                            : `ℹ +${rateDiffPercent}% above benchmark`}
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ position: 'relative' }}>
+                      <span style={{
+                        position: 'absolute',
+                        left: '14px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        fontSize: '17px',
+                        fontWeight: 800,
+                        color: '#64748B'
+                      }}>
+                        ৳
+                      </span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        required
+                        placeholder={targetRate > 0 ? targetRate.toFixed(2) : "e.g. 4.20"}
+                        value={bidAmount}
+                        onChange={e => setBidAmount(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '12px 14px 12px 34px',
+                          borderRadius: '10px',
+                          border: '2px solid #CBD5E1',
+                          fontSize: '16px',
+                          fontWeight: 700,
+                          color: '#0F172A',
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                        onFocus={e => e.currentTarget.style.borderColor = '#FF5A1F'}
+                        onBlur={e => e.currentTarget.style.borderColor = '#CBD5E1'}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Real-time Total Quotation Box */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%)',
+                    border: '1.5px solid #FDBA74',
+                    borderRadius: '14px',
+                    padding: '16px',
+                    marginBottom: '16px'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: 800, color: '#C2410C', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          Total Quotation Value
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#7C2D12', marginTop: '2px' }}>
+                          Calculation: {isValidVal ? `৳ ${enteredUnitVal.toFixed(2)} × ${qty.toLocaleString()} ${unitName}` : `Enter unit price to calculate`}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '22px', fontWeight: 900, color: '#EA580C' }}>
+                        ৳ {totalQuotationVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#9A3412', marginTop: '8px', borderTop: '1px dashed #FDBA74', paddingTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>🛡️</span> PackBang Escrow Guaranteed. Direct bank payout released 24h after delivery sign-off.
+                    </div>
+                  </div>
+
+                  {/* Production & Delivery Lead Time */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 800, color: '#0F172A', marginBottom: '6px' }}>
+                      Manufacturing & Delivery Lead Time *
+                    </label>
+                    <select
+                      value={bidDeliveryTime}
+                      onChange={e => setBidDeliveryTime(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '11px 14px',
+                        borderRadius: '10px',
+                        border: '1.5px solid #CBD5E1',
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        color: '#0F172A',
+                        background: '#FFFFFF',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <option value="2-3 Working Days">2-3 Working Days (Express Factory Run)</option>
+                      <option value="3-5 Working Days">3-5 Working Days (Standard)</option>
+                      <option value="5-7 Working Days">5-7 Working Days</option>
+                      <option value="7-10 Working Days">7-10 Working Days</option>
+                      <option value="10-15 Working Days">10-15 Working Days (Bulk / Cylinder Engraving)</option>
+                      <option value="15-21 Working Days">15-21 Working Days (Custom Import / Large Consignment)</option>
+                    </select>
+                  </div>
+
+                  {/* Factory Technical Notes / Specs */}
+                  <div style={{ marginBottom: '18px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 800, color: '#0F172A', marginBottom: '6px' }}>
+                      Technical Specifications & Production Notes (Optional)
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="e.g., 120 GSM virgin kraft, 2-color flexographic printing, cylinder charges included, bundle packing..."
+                      value={bidNote}
+                      onChange={e => setBidNote(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: '10px',
+                        border: '1.5px solid #CBD5E1',
+                        fontSize: '13px',
+                        fontFamily: 'inherit',
+                        boxSizing: 'border-box',
+                        resize: 'vertical'
+                      }}
+                    />
+                  </div>
+
+                  {/* Mandatory Terms & Conditions Checkbox */}
+                  <div style={{
+                    background: bidTermsAccepted ? '#F0FDF4' : '#F8FAFC',
+                    border: bidTermsAccepted ? '1.5px solid #86EFAC' : '1.5px solid #CBD5E1',
+                    borderRadius: '12px',
+                    padding: '14px',
+                    marginBottom: '20px',
+                    transition: 'all 0.2s ease'
+                  }}>
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '10px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      color: '#0F172A',
+                      fontWeight: 600,
+                      lineHeight: '1.4'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={bidTermsAccepted}
+                        onChange={e => setBidTermsAccepted(e.target.checked)}
+                        style={{
+                          width: '18px',
+                          height: '18px',
+                          marginTop: '2px',
+                          accentColor: '#FF5A1F',
+                          cursor: 'pointer'
+                        }}
+                      />
+                      <div>
+                        <span>
+                          I agree to the <strong>PackBang Seller & Packaging Manufacturer Terms & Conditions</strong>.
+                        </span>
+                        <div style={{ marginTop: '4px' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              fetchAndOpenSellerTerms();
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              padding: 0,
+                              color: '#FF5A1F',
+                              fontWeight: 800,
+                              fontSize: '12px',
+                              textDecoration: 'underline',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            📄 Read Full Seller Manufacturing Agreement
+                          </button>
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Actions */}
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    alignItems: 'center',
+                    gap: '12px',
+                    paddingTop: '8px'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => setBidModalItem(null)}
+                      style={{
+                        padding: '11px 20px',
+                        borderRadius: '10px',
+                        border: '1.5px solid #CBD5E1',
+                        background: '#FFFFFF',
+                        color: '#475569',
+                        fontSize: '14px',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmittingBid || !bidTermsAccepted || !isValidVal}
+                      style={{
+                        padding: '11px 26px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        background: (!bidTermsAccepted || !isValidVal) ? '#94A3B8' : 'linear-gradient(135deg, #FF5A1F 0%, #E04810 100%)',
+                        color: '#FFFFFF',
+                        fontSize: '14px',
+                        fontWeight: 800,
+                        cursor: (!bidTermsAccepted || !isValidVal) ? 'not-allowed' : 'pointer',
+                        boxShadow: (!bidTermsAccepted || !isValidVal) ? 'none' : '0 4px 14px rgba(255, 90, 31, 0.35)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {isSubmittingBid ? 'Submitting...' : '🚀 Submit Official Quotation'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Seller Terms & Conditions Modal */}
+      {showSellerTermsModal && (
         <div style={{
           position: 'fixed',
           top: 0,
           left: 0,
           width: '100%',
           height: '100%',
-          background: 'rgba(0,0,0,0.5)',
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 9999
+          zIndex: 10000,
+          padding: '16px'
         }}>
           <div style={{
             background: '#FFFFFF',
-            borderRadius: '16px',
-            padding: '28px',
-            width: '90%',
-            maxWidth: '460px',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
+            borderRadius: '20px',
+            width: '100%',
+            maxWidth: '680px',
+            maxHeight: '88vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.3)',
+            border: '1px solid #E2E8F0',
+            overflow: 'hidden'
           }}>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: 800 }}>Submit Wholesale Quotation</h3>
-            <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#64748B' }}>
-              Buyer: <strong>{bidModalItem.buyer}</strong> ({bidModalItem.quantity.toLocaleString()} pcs)
-            </p>
-
-            <form onSubmit={handlePlaceBid}>
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, marginBottom: '6px' }}>
-                  Your Factory Price Per Unit (৳)
-                </label>
-                <input
-                  type="number"
-                  step="0.05"
-                  required
-                  placeholder="e.g. 4.10"
-                  value={bidAmount}
-                  onChange={e => setBidAmount(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '16px' }}
-                />
-                <span style={{ fontSize: '12px', color: '#059669', display: 'block', marginTop: '4px' }}>
-                  Target Budget: {bidModalItem.targetBudget}
-                </span>
+            {/* Header */}
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '2px solid #FF5A1F',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: '#FFFFFF'
+            }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>📜</span> {sellerTermsData?.title || 'Seller & Packaging Manufacturer Terms and Conditions'}
+                </h3>
+                <div style={{ fontSize: '12px', color: '#64748B', marginTop: '3px' }}>
+                  Official B2B Manufacturing Policy & Escrow Payout Compliance
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => setShowSellerTermsModal(false)}
+                style={{
+                  background: '#F1F5F9',
+                  border: 'none',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#64748B',
+                  fontSize: '15px',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                ✕
+              </button>
+            </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            {/* Terms Content Body */}
+            <div style={{
+              padding: '22px 24px',
+              overflowY: 'auto',
+              flex: 1,
+              fontSize: '13px',
+              lineHeight: '1.7',
+              color: '#334155',
+              whiteSpace: 'pre-line'
+            }}>
+              {isLoadingSellerTerms ? (
+                <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748B' }}>
+                  <div style={{ fontSize: '24px', marginBottom: '10px' }}>⏳</div>
+                  <div>Loading Official Seller Terms & Conditions...</div>
+                </div>
+              ) : (
+                sellerTermsData?.content || `1. Binding Quotations & Manufacturing Commitments:
+All wholesale bids, factory unit rates, and delivery lead times submitted on the PackBang Seller Portal are legally binding once accepted by the buyer or approved by platform administration. Sellers may not retroactively increase quoted rates, scale back agreed quantities, or revoke bids following acceptance.
+
+2. Material Specifications & Industrial Quality Standards:
+The seller guarantees that all packaging materials (paper grammage/GSM, plastic microns, corrugated flute type, ply count, printing plates/cylinders, ink adhesion, and tensile resistance) strictly conform to the approved buyer specifications and pre-production proofs. Substituting inferior or substandard raw materials without prior written consent constitutes a material breach and grounds for contract cancellation.
+
+3. Production Tolerances & Defect Allowances:
+Standard packaging manufacturing tolerances apply across production runs (dimensions +/- 3mm to 5mm; GSM / thickness +/- 5%; finished batch count variation strictly within +/- 5%). Consignments with defects or dimensional variations exceeding allowable tolerance thresholds require prompt factory replacement at the manufacturer's expense.
+
+4. Turnaround Timelines & Dispatch Deadlines:
+Sellers must manufacture, quality-inspect, and hand over consignments to logistics within the agreed delivery schedule (e.g. 3-7 business days from proof approval). In the event of unforeseen machine breakdowns or force majeure, the seller must formally notify platform support in writing within 24 hours. Unexcused production delays exceeding 72 hours may incur late delivery penalty deductions.
+
+5. Strict Anti-Disintermediation & Platform Integrity:
+PackBang provides secure escrow payment protection and buyer matching. Sellers are strictly prohibited from soliciting buyers for off-platform communication (sharing personal phone numbers, WhatsApp, email addresses) or transacting outside the platform. Any attempt to bypass platform escrow will trigger immediate account suspension, permanent blacklist, and forfeiture of pending payouts.
+
+6. Inspection, Escrow Clearance & Payout Terms:
+Buyer payments are securely held in PackBang Escrow. Payouts (net of standard platform marketplace commission) are released directly to the seller's verified payout account within 24 to 48 hours of successful shipment delivery and buyer/QC inspection clearance.
+
+7. Defective Batches & Dispute Resolution:
+If delivered goods fail quality inspection due to printing defects, incorrect sizing, or material flaws, PackBang dispute arbitration will investigate. The seller agrees to either produce a replacement batch within 5 business days or allow an escrow refund deduction corresponding to the defective percentage.`
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              padding: '16px 24px',
+              borderTop: '1px solid #E2E8F0',
+              background: '#F8FAFC',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '12px'
+            }}>
+              <span style={{ fontSize: '12px', color: '#64748B' }}>
+                🛡️ Binding for all certified packaging suppliers on PackBang.
+              </span>
+              <div style={{ display: 'flex', gap: '10px' }}>
                 <button
                   type="button"
-                  onClick={() => setBidModalItem(null)}
-                  style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#fff', cursor: 'pointer', fontWeight: 700 }}
+                  onClick={() => setShowSellerTermsModal(false)}
+                  style={{
+                    padding: '9px 18px',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    background: '#FFFFFF',
+                    color: '#475569',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
                 >
-                  Cancel
+                  Close
                 </button>
                 <button
-                  type="submit"
-                  disabled={isSubmittingBid}
-                  style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', background: '#FF5A1F', color: '#fff', cursor: 'pointer', fontWeight: 700, opacity: isSubmittingBid ? 0.7 : 1 }}
+                  type="button"
+                  onClick={() => {
+                    setBidTermsAccepted(true);
+                    setShowSellerTermsModal(false);
+                  }}
+                  style={{
+                    padding: '9px 20px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: '#FF5A1F',
+                    color: '#FFFFFF',
+                    fontSize: '13px',
+                    fontWeight: 800,
+                    cursor: 'pointer'
+                  }}
                 >
-                  {isSubmittingBid ? 'Submitting...' : 'Submit Quote'}
+                  ✓ I Understand & Agree
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
