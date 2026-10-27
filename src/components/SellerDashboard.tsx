@@ -62,6 +62,7 @@ interface ProductItem {
 
 interface OrderItem {
   orderId: string;
+  type?: 'direct_sale' | 'custom_order' | string;
   buyerShop: string;
   items: string;
   amount: number;
@@ -108,7 +109,7 @@ export default function SellerDashboard({
     currentSeller.nidFrontImage &&
     currentSeller.nidBackImage
   );
-  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'bids' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'bids' | 'reports' | 'settings'>('overview');
   const [showAddModal, setShowAddModal] = useState(false);
   const [bidModalItem, setBidModalItem] = useState<CustomBidRequest | null>(null);
   const [bidAmount, setBidAmount] = useState('');
@@ -123,6 +124,12 @@ export default function SellerDashboard({
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [previewImageModal, setPreviewImageModal] = useState<{ url: string; title: string } | null>(null);
   const [previewImageRotation, setPreviewImageRotation] = useState<number>(0);
+
+  // Sales Report Filter States
+  const [reportSaleType, setReportSaleType] = useState<'all' | 'regular' | 'custom'>('all');
+  const [reportSearchQuery, setReportSearchQuery] = useState('');
+  const [reportStatusFilter, setReportStatusFilter] = useState('all');
+  const [reportSortBy, setReportSortBy] = useState<'newest' | 'oldest' | 'highest' | 'lowest'>('newest');
 
   // Store API base URL for live marketplace sync
   const storeApiUrl = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
@@ -1459,6 +1466,7 @@ export default function SellerDashboard({
             { id: 'overview', label: currentLang === 'bn' ? 'ওভারভিউ ও অর্ডার' : 'Overview & Orders', icon: '📊' },
             { id: 'products', label: currentLang === 'bn' ? 'প্যাকেজিং ইনভেন্টরি' : 'Packaging Inventory', icon: '📦' },
             { id: 'bids', label: currentLang === 'bn' ? 'পাইকারি কোটেশন বিড' : 'Wholesale Bids', icon: '⚡' },
+            { id: 'reports', label: currentLang === 'bn' ? 'বিক্রয় রিপোর্ট' : 'Sales Report', icon: '📈' },
             { id: 'settings', label: currentLang === 'bn' ? 'ফ্যাক্টরি প্রোফাইল' : 'Factory Profile', icon: '⚙️' }
           ].map(tab => (
             <button
@@ -2167,6 +2175,385 @@ export default function SellerDashboard({
             </div>
           </div>
         )}
+
+                {/* TAB 4: SALES REPORT */}
+        {activeTab === 'reports' && (() => {
+          const sellerTotalOrders = orders;
+          const totalSellerRevenue = sellerTotalOrders.reduce((sum, o) => sum + (o.amount || 0), 0);
+          const regularSellerOrders = sellerTotalOrders.filter(o => o.type === 'direct_sale' || !o.type);
+          const regularSellerRevenue = regularSellerOrders.reduce((sum, o) => sum + (o.amount || 0), 0);
+          const customSellerOrders = sellerTotalOrders.filter(o => o.type === 'custom_order');
+          const customSellerRevenue = customSellerOrders.reduce((sum, o) => sum + (o.amount || 0), 0);
+
+          const filteredReportOrders = sellerTotalOrders.filter(o => {
+            if (reportSaleType === 'regular' && o.type === 'custom_order') return false;
+            if (reportSaleType === 'custom' && o.type !== 'custom_order') return false;
+            if (reportStatusFilter !== 'all' && (o.status || '').toLowerCase() !== reportStatusFilter.toLowerCase()) return false;
+            if (reportSearchQuery.trim()) {
+              const q = reportSearchQuery.toLowerCase().trim();
+              const matchId = (o.orderId || '').toLowerCase().includes(q);
+              const matchBuyer = (o.buyerShop || '').toLowerCase().includes(q);
+              const matchItems = (o.items || '').toLowerCase().includes(q);
+              if (!matchId && !matchBuyer && !matchItems) return false;
+            }
+            return true;
+          });
+
+          filteredReportOrders.sort((a, b) => {
+            if (reportSortBy === 'highest') return (b.amount || 0) - (a.amount || 0);
+            if (reportSortBy === 'lowest') return (a.amount || 0) - (b.amount || 0);
+            const dateA = new Date(a.date).getTime() || 0;
+            const dateB = new Date(b.date).getTime() || 0;
+            if (reportSortBy === 'oldest') return dateA - dateB;
+            return dateB - dateA;
+          });
+
+          const visibleReportRevenue = filteredReportOrders.reduce((sum, o) => sum + (o.amount || 0), 0);
+
+          const exportSellerSalesReport = () => {
+            if (filteredReportOrders.length === 0) {
+              alert('No sales data currently visible to export!');
+              return;
+            }
+            const headers = ['Order ID', 'Sale Type', 'Buyer / Merchant', 'Items', 'Total Amount (BDT)', 'Date', 'Status', 'Courier'];
+            const csvRows = filteredReportOrders.map(o => [
+              `"${o.orderId}"`,
+              `"${o.type === 'custom_order' ? 'Custom Packaging Order' : 'Regular Sale'}"`,
+              `"${(o.buyerShop || '').replace(/"/g, '""')}"`,
+              `"${(o.items || '').replace(/"/g, '""')}"`,
+              o.amount || 0,
+              `"${o.date || ''}"`,
+              `"${o.status || ''}"`,
+              `"${(o.courier || '').replace(/"/g, '""')}"`
+            ]);
+            const csvString = [headers.join(','), ...csvRows.map(r => r.join(','))].join('\n');
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `seller_sales_report_${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          };
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Report Header Card */}
+              <div className="seller-content-card" style={{
+                background: '#FFFFFF',
+                borderRadius: '16px',
+                padding: '24px',
+                border: '1.5px solid #E2E8F0',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.03)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', marginBottom: '20px' }}>
+                  <div>
+                    <h3 style={{ margin: '0 0 4px 0', fontSize: '1.4rem', fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span>📈</span> {currentLang === 'bn' ? 'ফ্যাক্টরি বিক্রয় ও আয় রিপোর্ট' : 'Factory Sales & Revenue Report'}
+                    </h3>
+                    <p style={{ margin: 0, fontSize: '0.88rem', color: '#64748B' }}>
+                      {currentLang === 'bn' 
+                        ? 'আপনার ফ্যাক্টরির নিজস্ব নিয়মিত পণ্য ও কাস্টম প্যাকেজিং অর্ডারের সমন্বিত হিসাব।' 
+                        : 'Unified performance ledger for your direct packaging sales and custom manufacturing bids.'}
+                    </p>
+                  </div>
+                  <div style={{
+                    background: '#FEF3C7',
+                    color: '#B45309',
+                    padding: '6px 14px',
+                    borderRadius: '20px',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <span>🏭</span> {currentSeller.shopName || 'Verified Factory'}
+                  </div>
+                </div>
+
+                {/* 4 Stats Cards */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gap: '14px',
+                  marginBottom: '24px'
+                }}>
+                  <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: '12px', padding: '16px' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0284C7', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '4px' }}>
+                      {currentLang === 'bn' ? 'মোট বিক্রয় আয়' : 'Total Sales Revenue'}
+                    </div>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0369A1' }}>
+                      BDT. {totalSellerRevenue.toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: '#0284C7', marginTop: '2px' }}>
+                      {sellerTotalOrders.length} {currentLang === 'bn' ? 'টি মোট অর্ডার' : 'total orders'}
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '12px', padding: '16px' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#D97706', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '4px' }}>
+                      {currentLang === 'bn' ? 'মোট লেনদেন' : 'Total Transactions'}
+                    </div>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#B45309' }}>
+                      {sellerTotalOrders.length}
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: '#D97706', marginTop: '2px' }}>
+                      {currentLang === 'bn' ? 'সম্পন্ন ও প্রক্রিয়াধীন' : 'Completed & Active'}
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#FFF7ED', border: '1px solid #FED7AA', borderRadius: '12px', padding: '16px' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#EA580C', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '4px' }}>
+                      {currentLang === 'bn' ? 'নিয়মিত পণ্য বিক্রয়' : 'Regular Sales (Direct)'}
+                    </div>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#C2410C' }}>
+                      BDT. {regularSellerRevenue.toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: '#EA580C', marginTop: '2px' }}>
+                      {regularSellerOrders.length} {currentLang === 'bn' ? 'টি পণ্য বিক্রয়' : 'direct items'}
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#FAF5FF', border: '1px solid #E9D5FF', borderRadius: '12px', padding: '16px' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#9333EA', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '4px' }}>
+                      {currentLang === 'bn' ? 'কাস্টম অর্ডার বিড' : 'Custom Orders (Bids)'}
+                    </div>
+                    <div style={{ fontSize: '1.3rem', fontWeight: 800, color: '#7E22CE' }}>
+                      BDT. {customSellerRevenue.toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: '#9333EA', marginTop: '2px' }}>
+                      {customSellerOrders.length} {currentLang === 'bn' ? 'টি কাস্টম অর্ডার' : 'custom orders'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filter Toolbar */}
+                <div style={{
+                  display: 'flex',
+                  gap: '12px',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  background: '#F8FAFC',
+                  padding: '16px',
+                  borderRadius: '12px',
+                  border: '1px solid #E2E8F0',
+                  marginBottom: '16px'
+                }}>
+                  <div style={{ flex: '1.5', minWidth: '200px' }}>
+                    <input
+                      type="text"
+                      placeholder={currentLang === 'bn' ? 'অর্ডার আইডি, বায়ার বা পণ্যের নাম খুঁজুন...' : 'Search order ID, buyer shop, item...'}
+                      value={reportSearchQuery}
+                      onChange={e => setReportSearchQuery(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        border: '1.5px solid #CBD5E1',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        outline: 'none',
+                        background: '#FFFFFF',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  {/* Sale Type Filter Dropdown */}
+                  <select
+                    value={reportSaleType}
+                    onChange={e => setReportSaleType(e.target.value as any)}
+                    style={{
+                      padding: '10px 14px',
+                      border: '1.5px solid #CBD5E1',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      color: '#334155',
+                      outline: 'none',
+                      background: '#FFFFFF',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="all">🏷️ {currentLang === 'bn' ? 'সকল সেলস টাইপ' : 'All Sale Types'}</option>
+                    <option value="regular">🛍️ {currentLang === 'bn' ? 'নিয়মিত পণ্য বিক্রয়' : 'Regular Sales'}</option>
+                    <option value="custom">🎨 {currentLang === 'bn' ? 'কাস্টম প্যাকেজিং অর্ডার' : 'Custom Packaging Orders'}</option>
+                  </select>
+
+                  {/* Status Filter Dropdown */}
+                  <select
+                    value={reportStatusFilter}
+                    onChange={e => setReportStatusFilter(e.target.value)}
+                    style={{
+                      padding: '10px 14px',
+                      border: '1.5px solid #CBD5E1',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      color: '#334155',
+                      outline: 'none',
+                      background: '#FFFFFF',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="all">📌 {currentLang === 'bn' ? 'সকল স্ট্যাটাস' : 'All Statuses'}</option>
+                    <option value="delivered">✅ {currentLang === 'bn' ? 'ডেলিভার্ড' : 'Delivered'}</option>
+                    <option value="processing">⏳ {currentLang === 'bn' ? 'প্রসেসিং' : 'Processing'}</option>
+                    <option value="shipped">🚚 {currentLang === 'bn' ? 'শিপড' : 'Shipped'}</option>
+                    <option value="pending">🕒 {currentLang === 'bn' ? 'পেন্ডিং' : 'Pending'}</option>
+                  </select>
+
+                  {/* Sort Filter Dropdown */}
+                  <select
+                    value={reportSortBy}
+                    onChange={e => setReportSortBy(e.target.value as any)}
+                    style={{
+                      padding: '10px 14px',
+                      border: '1.5px solid #CBD5E1',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      color: '#334155',
+                      outline: 'none',
+                      background: '#FFFFFF',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="newest">🔽 {currentLang === 'bn' ? 'নতুন আগে' : 'Newest First'}</option>
+                    <option value="oldest">🔼 {currentLang === 'bn' ? 'পুরনো আগে' : 'Oldest First'}</option>
+                    <option value="highest">💰 {currentLang === 'bn' ? 'সর্বোচ্চ আয়' : 'Highest Amount'}</option>
+                    <option value="lowest">💸 {currentLang === 'bn' ? 'সর্বনিম্ন আয়' : 'Lowest Amount'}</option>
+                  </select>
+
+                  {/* CSV Export Button */}
+                  <button
+                    onClick={exportSellerSalesReport}
+                    style={{
+                      padding: '10px 18px',
+                      background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontWeight: 700,
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: '0 2px 6px rgba(16, 185, 129, 0.25)'
+                    }}
+                  >
+                    <span>📊</span> {currentLang === 'bn' ? 'সিএসভি এক্সপোর্ট' : 'Export CSV'}
+                  </button>
+                </div>
+
+                {/* Live Count Pill */}
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: '#F1F5F9',
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  fontSize: '13px',
+                  color: '#475569',
+                  marginBottom: '16px',
+                  fontWeight: 600
+                }}>
+                  <span>🔍</span> {currentLang === 'bn' ? 'প্রদর্শিত:' : 'Showing:'} <strong>{filteredReportOrders.length}</strong> {currentLang === 'bn' ? 'টি লেনদেন (আয়: ' : 'transactions (Revenue: '} <strong>BDT. {visibleReportRevenue.toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>)
+                </div>
+
+                {/* Transactions Table */}
+                {filteredReportOrders.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94A3B8' }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '8px' }}>🧾</div>
+                    <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#475569' }}>
+                      {currentLang === 'bn' ? 'কোন বিক্রয় রেকর্ড পাওয়া যায়নি' : 'No sales records match your criteria'}
+                    </div>
+                    <div style={{ fontSize: '0.85rem' }}>
+                      {currentLang === 'bn' ? 'ফিল্টার পরিবর্তন করে আবার চেষ্টা করুন।' : 'Try adjusting your search query or sale type filter.'}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+                      <thead>
+                        <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', color: '#64748B', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          <th style={{ padding: '12px 14px' }}>{currentLang === 'bn' ? 'অর্ডার আইডি' : 'Order ID'}</th>
+                          <th style={{ padding: '12px 14px' }}>{currentLang === 'bn' ? 'সেলস টাইপ' : 'Sale Type'}</th>
+                          <th style={{ padding: '12px 14px' }}>{currentLang === 'bn' ? 'ক্রেতা / বায়ার' : 'Buyer / Merchant'}</th>
+                          <th style={{ padding: '12px 14px' }}>{currentLang === 'bn' ? 'পণ্য বিবরণ' : 'Items'}</th>
+                          <th style={{ padding: '12px 14px' }}>{currentLang === 'bn' ? 'মোট মূল্য' : 'Total Amount'}</th>
+                          <th style={{ padding: '12px 14px' }}>{currentLang === 'bn' ? 'তারিখ' : 'Date'}</th>
+                          <th style={{ padding: '12px 14px' }}>{currentLang === 'bn' ? 'স্ট্যাটাস' : 'Status'}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredReportOrders.map((ord, idx) => {
+                          const isCustom = ord.type === 'custom_order';
+                          const st = (ord.status || 'Pending').toLowerCase();
+                          return (
+                            <tr key={idx} style={{ borderBottom: '1px solid #F1F5F9', transition: 'background 0.15s' }}>
+                              <td style={{ padding: '12px 14px', fontFamily: 'monospace', fontWeight: 700, color: '#334155' }}>
+                                #{ord.orderId}
+                              </td>
+                              <td style={{ padding: '12px 14px' }}>
+                                <span style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '4px 10px',
+                                  borderRadius: '12px',
+                                  fontSize: '11px',
+                                  fontWeight: 800,
+                                  textTransform: 'uppercase',
+                                  background: isCustom ? '#FAF5FF' : '#FFF7ED',
+                                  color: isCustom ? '#7E22CE' : '#C2410C',
+                                  border: isCustom ? '1px solid #E9D5FF' : '1px solid #FED7AA'
+                                }}>
+                                  <span>{isCustom ? '🎨' : '🛍️'}</span>
+                                  {isCustom ? (currentLang === 'bn' ? 'কাস্টম অর্ডার' : 'Custom Order') : (currentLang === 'bn' ? 'নিয়মিত পণ্য' : 'Regular Sale')}
+                                </span>
+                              </td>
+                              <td style={{ padding: '12px 14px', fontWeight: 600, color: '#0F172A' }}>
+                                <div>{ord.buyerShop || 'Verified Merchant'}</div>
+                                <div style={{ fontSize: '11px', color: '#94A3B8' }}>{ord.courier || 'Packaging Logistics'}</div>
+                              </td>
+                              <td style={{ padding: '12px 14px', color: '#334155', maxWidth: '240px' }}>
+                                {ord.items}
+                              </td>
+                              <td style={{ padding: '12px 14px', fontWeight: 800, color: '#059669', whiteSpace: 'nowrap' }}>
+                                BDT. {(ord.amount || 0).toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+                              <td style={{ padding: '12px 14px', color: '#64748B', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                                {ord.date}
+                              </td>
+                              <td style={{ padding: '12px 14px' }}>
+                                <span style={{
+                                  display: 'inline-block',
+                                  padding: '4px 10px',
+                                  borderRadius: '12px',
+                                  fontSize: '12px',
+                                  fontWeight: 700,
+                                  textTransform: 'capitalize',
+                                  background: (st === 'delivered' || st === 'completed') ? '#DCFCE7' : (st === 'processing' ? '#DBEAFE' : (st === 'shipped' ? '#FEF3C7' : '#F1F5F9')),
+                                  color: (st === 'delivered' || st === 'completed') ? '#166534' : (st === 'processing' ? '#1E40AF' : (st === 'shipped' ? '#92400E' : '#475569'))
+                                }}>
+                                  {ord.status}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* TAB 4: FACTORY PROFILE & KYC VERIFICATION */}
         {activeTab === 'settings' && (
