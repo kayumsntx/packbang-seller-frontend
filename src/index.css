@@ -44,7 +44,7 @@
   --max-content-width: 1200px;
 }
 
-* {
+*, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -53,6 +53,10 @@
 html {
   scroll-behavior: smooth;
   font-size: 14px;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 body {
@@ -61,7 +65,18 @@ body {
   background-color: var(--pb-white);
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  width: 100%;
+  max-width: 100vw;
   overflow-x: hidden;
+  position: relative;
+  box-sizing: border-box;
+}
+
+#root {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 a {
@@ -1900,3 +1915,144 @@ button {
   }
 }
 
+
+
+/* =========================================================
+   SELLER HUB CORE RESPONSIVE & MOBILE NAVIGATION STYLES
+   ========================================================= */
+.seller-dashboard-wrapper {
+  min-height: 100vh;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  background: #F8FAFC;
+  color: #0F172A;
+}
+
+.seller-tabs-bar {
+  display: flex !important;
+  border-bottom: 2px solid #E2E8F0 !important;
+  margin-bottom: 24px !important;
+  gap: 8px !important;
+  overflow-x: auto !important;
+  white-space: nowrap !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.seller-tabs-bar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.seller-tab-btn {
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}
+
+.seller-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .seller-dashboard-header {
+    padding: 12px 14px !important;
+    gap: 12px !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .seller-dashboard-header-right {
+    width: 100% !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+  }
+  .seller-dashboard-header-right button {
+    flex: 1 !important;
+    padding: 8px 6px !important;
+    font-size: 12px !important;
+    text-align: center !important;
+    justify-content: center !important;
+  }
+  .seller-dashboard-body {
+    padding: 14px 12px 40px 12px !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    box-sizing: border-box !important;
+  }
+  .seller-welcome-banner {
+    padding: 18px 14px !important;
+    margin-bottom: 18px !important;
+    border-radius: 12px !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 16px !important;
+  }
+  .seller-welcome-banner h1 {
+    font-size: 19px !important;
+    line-height: 1.3 !important;
+  }
+  .seller-welcome-actions {
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+  .seller-welcome-actions button {
+    width: 100% !important;
+    justify-content: center !important;
+    text-align: center !important;
+    padding: 12px 14px !important;
+    font-size: 14px !important;
+  }
+  .seller-kyc-alert-banner {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 14px 12px !important;
+    gap: 12px !important;
+    border-radius: 12px !important;
+  }
+  .seller-kyc-alert-banner button,
+  .seller-kyc-alert-banner a {
+    width: 100% !important;
+    text-align: center !important;
+    justify-content: center !important;
+    padding: 10px 14px !important;
+    box-sizing: border-box !important;
+  }
+  .seller-metrics-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    margin-bottom: 20px !important;
+    width: 100% !important;
+  }
+  .seller-metric-card {
+    padding: 14px 16px !important;
+    border-radius: 12px !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+  }
+  .seller-products-stat-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+  .seller-content-card {
+    padding: 16px 12px !important;
+    border-radius: 12px !important;
+  }
+  .seller-form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  .seller-tab-btn {
+    padding: 10px 14px !important;
+    font-size: 13px !important;
+  }
+}

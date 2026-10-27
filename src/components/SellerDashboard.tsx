@@ -781,7 +781,7 @@ export default function SellerDashboard({
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', color: '#0F172A', fontFamily: 'inherit' }}>
+    <div className="seller-dashboard-wrapper" style={{ minHeight: '100vh', background: '#F8FAFC', color: '#0F172A', fontFamily: 'inherit', width: '100%', maxWidth: '100vw', overflowX: 'hidden', boxSizing: 'border-box' }}>
       
       {/* Toast Notification */}
       {notification && (
@@ -817,7 +817,9 @@ export default function SellerDashboard({
         justifyContent: 'space-between',
         flexWrap: 'wrap',
         gap: '16px',
-        boxShadow: '0 2px 12px rgba(0,0,0,0.15)'
+        boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
+        width: '100%',
+        boxSizing: 'border-box'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={onGoLanding}>
@@ -862,7 +864,7 @@ export default function SellerDashboard({
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="seller-dashboard-header-right" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           {/* Language Switch */}
           <button
             onClick={() => onLangChange(currentLang === 'en' ? 'bn' : 'en')}
@@ -917,10 +919,10 @@ export default function SellerDashboard({
       </header>
 
       {/* Dashboard Body */}
-      <div className="seller-dashboard-body" style={{ maxWidth: '1280px', margin: '0 auto', padding: '24px 20px' }}>
+      <div className="seller-dashboard-body" style={{ maxWidth: '1280px', margin: '0 auto', padding: '24px 20px', width: '100%', boxSizing: 'border-box' }}>
 
         {/* Welcome Banner */}
-        <div style={{
+        <div className="seller-welcome-banner" style={{
           background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
           borderRadius: '16px',
           padding: '24px 28px',
@@ -931,7 +933,9 @@ export default function SellerDashboard({
           justifyContent: 'space-between',
           flexWrap: 'wrap',
           gap: '20px',
-          boxShadow: '0 10px 25px rgba(15, 23, 42, 0.15)'
+          boxShadow: '0 10px 25px rgba(15, 23, 42, 0.15)',
+          width: '100%',
+          boxSizing: 'border-box'
         }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
@@ -1018,7 +1022,7 @@ export default function SellerDashboard({
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div className="seller-welcome-actions" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             <button
               onClick={() => {
                 if (isSuspended) {
@@ -1063,7 +1067,7 @@ export default function SellerDashboard({
 
         {/* DYNAMIC STATUS & VERIFICATION BANNERS */}
         {!hasRequiredKyc ? (
-          <div style={{
+          <div className="seller-kyc-alert-banner" style={{
             background: '#FFFBEB',
             border: '1.5px solid #F59E0B',
             borderRadius: '14px',
@@ -1073,7 +1077,9 @@ export default function SellerDashboard({
             alignItems: 'center',
             justifyContent: 'space-between',
             flexWrap: 'wrap',
-            gap: '14px'
+            gap: '14px',
+            width: '100%',
+            boxSizing: 'border-box'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{
@@ -1120,7 +1126,7 @@ export default function SellerDashboard({
             </button>
           </div>
         ) : isPendingApproval ? (
-          <div style={{
+          <div className="seller-kyc-alert-banner" style={{
             background: '#EFF6FF',
             border: '1.5px solid #3B82F6',
             borderRadius: '14px',
@@ -1130,7 +1136,9 @@ export default function SellerDashboard({
             alignItems: 'center',
             justifyContent: 'space-between',
             flexWrap: 'wrap',
-            gap: '14px'
+            gap: '14px',
+            width: '100%',
+            boxSizing: 'border-box'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{
@@ -1175,7 +1183,7 @@ export default function SellerDashboard({
             </button>
           </div>
         ) : isSuspended ? (
-          <div style={{
+          <div className="seller-kyc-alert-banner" style={{
             background: '#FAF5FF',
             border: '1.5px solid #9333EA',
             borderRadius: '14px',
@@ -1185,7 +1193,9 @@ export default function SellerDashboard({
             alignItems: 'center',
             justifyContent: 'space-between',
             flexWrap: 'wrap',
-            gap: '14px'
+            gap: '14px',
+            width: '100%',
+            boxSizing: 'border-box'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{
@@ -1229,7 +1239,7 @@ export default function SellerDashboard({
             </a>
           </div>
         ) : isBanned ? (
-          <div style={{
+          <div className="seller-kyc-alert-banner" style={{
             background: '#FEF2F2',
             border: '1.5px solid #EF4444',
             borderRadius: '14px',
@@ -1239,7 +1249,9 @@ export default function SellerDashboard({
             alignItems: 'center',
             justifyContent: 'space-between',
             flexWrap: 'wrap',
-            gap: '14px'
+            gap: '14px',
+            width: '100%',
+            boxSizing: 'border-box'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{
@@ -1282,7 +1294,7 @@ export default function SellerDashboard({
             </a>
           </div>
         ) : isRejected ? (
-          <div style={{
+          <div className="seller-kyc-alert-banner" style={{
             background: '#FEF2F2',
             border: '1.5px solid #F87171',
             borderRadius: '14px',
@@ -1292,7 +1304,9 @@ export default function SellerDashboard({
             alignItems: 'center',
             justifyContent: 'space-between',
             flexWrap: 'wrap',
-            gap: '14px'
+            gap: '14px',
+            width: '100%',
+            boxSizing: 'border-box'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{
@@ -1338,19 +1352,22 @@ export default function SellerDashboard({
         ) : null}
 
         {/* 4 Isolated Metric KPI Cards */}
-        <div style={{
+        <div className="seller-metrics-grid" style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
           gap: '18px',
-          marginBottom: '28px'
+          marginBottom: '28px',
+          width: '100%',
+          boxSizing: 'border-box'
         }}>
           {/* Card 1: Individual Seller Stock */}
-          <div style={{
+          <div className="seller-metric-card" style={{
             background: '#FFFFFF',
             borderRadius: '14px',
             padding: '20px',
             boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
-            border: '1px solid #E2E8F0'
+            border: '1px solid #E2E8F0',
+            boxSizing: 'border-box'
           }}>
             <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>
               📦 {currentLang === 'bn' ? 'আপনার ইন-স্টক ইউনিট' : 'Total Units in Stock'}
@@ -1364,12 +1381,13 @@ export default function SellerDashboard({
           </div>
 
           {/* Card 2: Individual Seller Total Sales */}
-          <div style={{
+          <div className="seller-metric-card" style={{
             background: '#FFFFFF',
             borderRadius: '14px',
             padding: '20px',
             boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
-            border: '1px solid #E2E8F0'
+            border: '1px solid #E2E8F0',
+            boxSizing: 'border-box'
           }}>
             <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>
               💰 {currentLang === 'bn' ? 'আপনার মোট বিক্রি (রেভিনিউ)' : 'Total Sales (Revenue)'}
@@ -1383,12 +1401,13 @@ export default function SellerDashboard({
           </div>
 
           {/* Card 3: Custom Wholesale Bids Placed */}
-          <div style={{
+          <div className="seller-metric-card" style={{
             background: '#FFFFFF',
             borderRadius: '14px',
             padding: '20px',
             boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
-            border: '1px solid #E2E8F0'
+            border: '1px solid #E2E8F0',
+            boxSizing: 'border-box'
           }}>
             <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>
               ⚡ {currentLang === 'bn' ? 'কাস্টম পাইকারি বিড' : 'Wholesale Bids Placed'}
@@ -1402,12 +1421,13 @@ export default function SellerDashboard({
           </div>
 
           {/* Card 4: Orders & Shipments */}
-          <div style={{
+          <div className="seller-metric-card" style={{
             background: '#FFFFFF',
             borderRadius: '14px',
             padding: '20px',
             boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
-            border: '1px solid #E2E8F0'
+            border: '1px solid #E2E8F0',
+            boxSizing: 'border-box'
           }}>
             <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>
               🚚 {currentLang === 'bn' ? 'আপনার অর্ডারসমূহ' : 'Factory Orders'}
@@ -1422,11 +1442,18 @@ export default function SellerDashboard({
         </div>
 
         {/* Tab Navigation */}
-        <div style={{
+        <div className="seller-tabs-bar" style={{
           display: 'flex',
           borderBottom: '2px solid #E2E8F0',
           marginBottom: '24px',
-          gap: '8px'
+          gap: '8px',
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+          maxWidth: '100%',
+          width: '100%',
+          boxSizing: 'border-box'
         }}>
           {[
             { id: 'overview', label: currentLang === 'bn' ? 'ওভারভিউ ও অর্ডার' : 'Overview & Orders', icon: '📊' },
@@ -1436,6 +1463,7 @@ export default function SellerDashboard({
           ].map(tab => (
             <button
               key={tab.id}
+              className="seller-tab-btn"
               onClick={() => setActiveTab(tab.id as any)}
               style={{
                 background: 'transparent',
@@ -1450,7 +1478,9 @@ export default function SellerDashboard({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
               }}
             >
               <span>{tab.icon}</span>
@@ -1462,12 +1492,13 @@ export default function SellerDashboard({
         {/* TAB 1: OVERVIEW & RECENT ORDERS */}
         {activeTab === 'overview' && (
           <div>
-            <div style={{
+            <div className="seller-content-card" style={{
               background: '#FFFFFF',
               borderRadius: '14px',
               padding: '24px',
               border: '1px solid #E2E8F0',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
+              boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+              boxSizing: 'border-box'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
                 <div>
@@ -1574,7 +1605,7 @@ export default function SellerDashboard({
         {activeTab === 'products' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {/* Top Stat Summary Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '16px' }}>
+            <div className="seller-products-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '16px' }}>
               <div style={{ background: '#FFFFFF', padding: '18px 20px', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <div style={{ width: '46px', height: '46px', borderRadius: '10px', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>📦</div>
                 <div>
@@ -1605,12 +1636,13 @@ export default function SellerDashboard({
             </div>
 
             {/* Inventory Container */}
-            <div style={{
+            <div className="seller-content-card" style={{
               background: '#FFFFFF',
               borderRadius: '14px',
               padding: '24px',
               border: '1px solid #E2E8F0',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.03)'
+              boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+              boxSizing: 'border-box'
             }}>
               {/* Header and Action Bar */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '14px' }}>
@@ -2229,7 +2261,7 @@ export default function SellerDashboard({
                   <span>{currentLang === 'bn' ? '১. সেলার ও কারখানা পরিচিতি' : '1. Seller Identity & Factory Details'}</span>
                 </h4>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                <div className="seller-form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', boxSizing: 'border-box' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
                       {currentLang === 'bn' ? 'সেলার নাম (মালিকের নাম) *' : 'Seller Legal Name (Owner Name) *'}
@@ -2520,7 +2552,7 @@ export default function SellerDashboard({
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                <div className="seller-form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', boxSizing: 'border-box' }}>
                   
                   {/* NID FRONT PART */}
                   <div style={{ border: '1px solid #E2E8F0', borderRadius: '10px', padding: '16px', background: '#FAFAFA' }}>
@@ -2722,7 +2754,7 @@ export default function SellerDashboard({
                   <span>{currentLang === 'bn' ? '৪. পেমেন্ট সেটেলমেন্ট ব্যাংক অ্যাকাউন্ট' : '4. Settlement Bank & Payout Details'}</span>
                 </h4>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                <div className="seller-form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', boxSizing: 'border-box' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>Bank Name</label>
                     <input
