@@ -58,6 +58,8 @@ interface ProductItem {
   description?: string;
   status: 'in_stock' | 'low_stock' | 'out_of_stock';
   isActive?: boolean;
+  approvalStatus?: 'approved' | 'pending' | 'rejected';
+  rejectionReason?: string;
 }
 
 interface OrderItem {
@@ -252,7 +254,9 @@ export default function SellerDashboard({
             images: p.images || [],
             description: p.description || '',
             status: p.stock > 10 ? 'in_stock' : (p.stock > 0 ? 'low_stock' : 'out_of_stock'),
-            isActive: p.isActive !== false
+            isActive: p.isActive !== false,
+            approvalStatus: p.approvalStatus || (p.isActive ? 'approved' : 'pending'),
+            rejectionReason: p.rejectionReason || ''
           }));
           setProducts(mapped);
         }
@@ -559,7 +563,7 @@ export default function SellerDashboard({
 
       const data = await res.json();
       if (data.success && data.product) {
-        showToast(currentLang === 'bn' ? 'পণ্যটি লাইভ ক্যাটালগে পোস্ট হয়েছে!' : 'Product listed live on PackBang marketplace!');
+        showToast(data.message || (currentLang === 'bn' ? 'পণ্যটি সফলভাবে সাবমিট হয়েছে!' : 'Product listed successfully!'));
         setShowAddModal(false);
         setNewProductName('');
         setNewPrice('');
@@ -1898,40 +1902,87 @@ export default function SellerDashboard({
                             </td>
 
                             <td style={{ padding: '14px 14px' }}>
-                              <span style={{
-                                padding: '4px 10px',
-                                borderRadius: '12px',
-                                fontSize: '12px',
-                                fontWeight: 800,
-                                background: p.stock > 10 ? '#DEF7EC' : (p.stock > 0 ? '#FEF08A' : '#FDE8E8'),
-                                color: p.stock > 10 ? '#03543F' : (p.stock > 0 ? '#854D0E' : '#9B1C1C'),
-                                display: 'inline-block'
-                              }}>
-                                {p.stock > 10 ? '● In Stock' : (p.stock > 0 ? '▲ Low Stock' : '✕ Out of Stock')}
-                              </span>
+                              {p.approvalStatus === 'pending' ? (
+                                <span style={{
+                                  padding: '4px 10px',
+                                  borderRadius: '12px',
+                                  fontSize: '11.5px',
+                                  fontWeight: 800,
+                                  background: '#FEF3C7',
+                                  color: '#92400E',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}>
+                                  ⏳ Awaiting Approval
+                                </span>
+                              ) : p.approvalStatus === 'rejected' ? (
+                                <span style={{
+                                  padding: '4px 10px',
+                                  borderRadius: '12px',
+                                  fontSize: '11.5px',
+                                  fontWeight: 800,
+                                  background: '#FEE2E2',
+                                  color: '#991B1B',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }} title={p.rejectionReason || 'Review required'}>
+                                  ✕ Review Required
+                                </span>
+                              ) : (
+                                <span style={{
+                                  padding: '4px 10px',
+                                  borderRadius: '12px',
+                                  fontSize: '12px',
+                                  fontWeight: 800,
+                                  background: p.stock > 10 ? '#DEF7EC' : (p.stock > 0 ? '#FEF08A' : '#FDE8E8'),
+                                  color: p.stock > 10 ? '#03543F' : (p.stock > 0 ? '#854D0E' : '#9B1C1C'),
+                                  display: 'inline-block'
+                                }}>
+                                  {p.stock > 10 ? '● In Stock' : (p.stock > 0 ? '▲ Low Stock' : '✕ Out of Stock')}
+                                </span>
+                              )}
                             </td>
 
                             <td style={{ padding: '14px 14px' }}>
                               <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                                <button
-                                  onClick={() => window.open(`${storeApiUrl}/product/${p.id}`, '_blank')}
-                                  title="View Live on PackBang Storefront"
-                                  style={{
-                                    background: '#F0FDF4',
-                                    color: '#15803D',
-                                    border: '1px solid #BBF7D0',
+                                {p.approvalStatus === 'pending' ? (
+                                  <span style={{
+                                    background: '#F8FAFC',
+                                    color: '#64748B',
+                                    border: '1px solid #E2E8F0',
                                     borderRadius: '6px',
                                     padding: '6px 10px',
-                                    cursor: 'pointer',
                                     fontWeight: 700,
-                                    fontSize: '12px',
+                                    fontSize: '11.5px',
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '4px'
-                                  }}
-                                >
-                                  🌐 View Live
-                                </button>
+                                  }}>
+                                    ⏳ In Review
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => window.open(`${storeApiUrl}/product/${p.id}`, '_blank')}
+                                    title="View Live on PackBang Storefront"
+                                    style={{
+                                      background: '#F0FDF4',
+                                      color: '#15803D',
+                                      border: '1px solid #BBF7D0',
+                                      borderRadius: '6px',
+                                      padding: '6px 10px',
+                                      cursor: 'pointer',
+                                      fontWeight: 700,
+                                      fontSize: '12px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px'
+                                    }}
+                                  >
+                                    🌐 View Live
+                                  </button>
+                                )}
 
                                 <button
                                   onClick={() => setEditingProduct(p)}
