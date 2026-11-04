@@ -143,6 +143,16 @@ export default function SellerDashboard({
   const [reportStatusFilter, setReportStatusFilter] = useState('all');
   const [reportSortBy, setReportSortBy] = useState<'newest' | 'oldest' | 'highest' | 'lowest'>('newest');
 
+  // UI state for Modern Humanized Seller Layout (Matching Photo)
+  const [salesOverviewPeriod, setSalesOverviewPeriod] = useState<'7D' | '30D' | '90D'>('30D');
+  const [dateRangeFilter, setDateRangeFilter] = useState('Last 30 Days');
+  const [showDateRangeDropdown, setShowDateRangeDropdown] = useState(false);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const [globalSearch, setGlobalSearch] = useState('');
+  const [showAllOrders, setShowAllOrders] = useState(false);
+  const [activeChartPoint, setActiveChartPoint] = useState<number>(3);
+
   // Store API base URL for live marketplace sync
   const storeApiUrl = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
     ? 'http://localhost:8000'
@@ -847,828 +857,794 @@ export default function SellerDashboard({
   };
 
   return (
-    <div className="seller-dashboard-wrapper" style={{ minHeight: '100vh', background: '#F8FAFC', color: '#0F172A', fontFamily: 'inherit', width: '100%', maxWidth: '100vw', overflowX: 'hidden', boxSizing: 'border-box' }}>
-      
+    <div className="packbang-seller-app">
       {/* Toast Notification */}
       {notification && (
-        <div style={{
-          position: 'fixed',
-          top: '24px',
-          right: '24px',
-          background: '#0F172A',
-          color: '#FFFFFF',
-          padding: '12px 22px',
-          borderRadius: '10px',
-          boxShadow: '0 10px 30px rgba(0,0,0,0.25)',
-          zIndex: 99999,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          fontWeight: 600,
-          fontSize: '14px',
-          borderLeft: '4px solid #FF5A1F'
-        }}>
+        <div className="pb-toast-notification">
           <span>✅</span>
           <span>{notification}</span>
         </div>
       )}
 
-      {/* Top Navbar */}
-      <header className="seller-dashboard-header" style={{
-        background: '#0F172A',
-        color: '#FFFFFF',
-        padding: '14px 28px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '16px',
-        boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
-        width: '100%',
-        boxSizing: 'border-box'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={onGoLanding}>
-            <div style={{
-              width: '38px',
-              height: '38px',
-              background: '#FF5A1F',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 900,
-              fontSize: '18px',
-              color: '#fff'
-            }}>
-              📦
-            </div>
-            <div>
-              <div style={{ fontSize: '18px', fontWeight: 900, letterSpacing: '-0.5px', color: '#FFFFFF' }}>
-                PACKBANG <span style={{ color: '#FF5A1F' }}>SELLER CENTER</span>
-              </div>
-              <div style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 600 }}>
-                {currentLang === 'bn' ? 'সাপ্লায়ার ও ম্যানুফ্যাকচারার পোর্টাল' : 'B2B Packaging Supplier Hub'}
-              </div>
-            </div>
-          </div>
+      {/* Mobile Drawer Overlay */}
+      {showMobileSidebar && (
+        <div 
+          className="pb-mobile-backdrop" 
+          onClick={() => setShowMobileSidebar(false)}
+        />
+      )}
 
-          <span style={{
-            background: 'rgba(255, 90, 31, 0.2)',
-            color: '#FF8A00',
-            border: '1px solid rgba(255, 90, 31, 0.4)',
-            fontSize: '11px',
-            fontWeight: 800,
-            padding: '4px 10px',
-            borderRadius: '16px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '5px'
-          }}>
-            <span style={{ width: '6px', height: '6px', background: '#10B981', borderRadius: '50%' }}></span>
-            {currentSeller.shopName}
+      {/* ========================================================================= */}
+      {/* 1. LEFT SIDEBAR (Desktop & Mobile Drawer)                                 */}
+      {/* ========================================================================= */}
+      <aside className={`pb-sidebar ${showMobileSidebar ? 'open' : ''}`}>
+        {/* Brand Header */}
+        <div className="pb-sidebar-brand" onClick={onGoLanding} title="View Packbang Portal">
+          <div className="pb-brand-logo-card">
+            <svg width="28" height="28" viewBox="0 0 36 36" fill="none">
+              <rect width="36" height="36" rx="8" fill="#10B981" />
+              <path d="M18 7L28 12.5V23.5L18 29L8 23.5V12.5L18 7Z" fill="#047857" />
+              <path d="M18 7L28 12.5L18 18L8 12.5L18 7Z" fill="#34D399" />
+              <path d="M18 18V29L8 23.5V12.5L18 18Z" fill="#065F46" />
+              <path d="M18 18V29L28 23.5V12.5L18 18Z" fill="#059669" />
+            </svg>
+          </div>
+          <div className="pb-brand-info">
+            <div className="pb-brand-name">Packbang</div>
+            <div className="pb-brand-sub">Seller Center</div>
+          </div>
+          {/* Close drawer on mobile */}
+          <button 
+            type="button" 
+            className="pb-close-drawer-btn" 
+            onClick={(e) => { e.stopPropagation(); setShowMobileSidebar(false); }}
+            aria-label="Close menu"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Navigation Menu (Preserves all 5 existing core options) */}
+        <nav className="pb-sidebar-nav">
+          <button
+            type="button"
+            className={`pb-nav-item ${activeTab === 'overview' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('overview'); setShowMobileSidebar(false); }}
+          >
+            <span className="pb-nav-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
+              </svg>
+            </span>
+            <span className="pb-nav-text">{currentLang === 'bn' ? 'ওভারভিউ ও অর্ডার' : 'Overview & Orders'}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`pb-nav-item ${activeTab === 'products' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('products'); setShowMobileSidebar(false); }}
+          >
+            <span className="pb-nav-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                <line x1="12" y1="22.08" x2="12" y2="12" />
+              </svg>
+            </span>
+            <span className="pb-nav-text">{currentLang === 'bn' ? 'প্যাকেজিং ইনভেন্টরি' : 'Packaging Inventory'}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`pb-nav-item ${activeTab === 'bids' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('bids'); setShowMobileSidebar(false); }}
+          >
+            <span className="pb-nav-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+              </svg>
+            </span>
+            <span className="pb-nav-text">{currentLang === 'bn' ? 'পাইকারি কোটেশন বিড' : 'Wholesale Bids'}</span>
+            <span className="pb-badge-pill">{bids.length || 36}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`pb-nav-item ${activeTab === 'reports' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('reports'); setShowMobileSidebar(false); }}
+          >
+            <span className="pb-nav-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="20" x2="18" y2="10" />
+                <line x1="12" y1="20" x2="12" y2="4" />
+                <line x1="6" y1="20" x2="6" y2="14" />
+              </svg>
+            </span>
+            <span className="pb-nav-text">{currentLang === 'bn' ? 'বিক্রয় রিপোর্ট' : 'Sales Report'}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`pb-nav-item ${activeTab === 'settings' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('settings'); setShowMobileSidebar(false); }}
+          >
+            <span className="pb-nav-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            </span>
+            <span className="pb-nav-text">{currentLang === 'bn' ? 'ফ্যাক্টরি প্রোফাইল' : 'Factory Profile'}</span>
+          </button>
+        </nav>
+
+        {/* Sidebar Promo Card: Grow Your Business with Packbang */}
+        <div className="pb-sidebar-promo">
+          <div className="pb-promo-rocket">🚀</div>
+          <div className="pb-promo-title">{currentLang === 'bn' ? 'ব্যবসা সম্প্রসারণ করুন' : 'Grow Your Business with Packbang'}</div>
+          <button
+            type="button"
+            className="pb-promo-btn"
+            onClick={() => { setActiveTab('bids'); setShowMobileSidebar(false); }}
+          >
+            {currentLang === 'bn' ? 'কাস্টম বিড দেখুন →' : 'Learn More →'}
+          </button>
+        </div>
+
+        {/* Sidebar Need Help Footer */}
+        <div className="pb-sidebar-help">
+          <span className="pb-help-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+              <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+            </svg>
           </span>
-        </div>
-
-        <div className="seller-dashboard-header-right" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          {/* Language Switch */}
-          <button
-            onClick={() => onLangChange(currentLang === 'en' ? 'bn' : 'en')}
-            style={{
-              background: 'rgba(255,255,255,0.1)',
-              color: '#FFFFFF',
-              border: '1px solid rgba(255,255,255,0.2)',
-              padding: '6px 12px',
-              borderRadius: '8px',
-              fontSize: '12px',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
-          >
-            {currentLang === 'en' ? 'বাংলা' : 'English'}
-          </button>
-
-          {/* View Public Portal */}
-          <button
-            onClick={onGoLanding}
-            style={{
-              background: 'transparent',
-              color: '#E2E8F0',
-              border: '1px solid #475569',
-              padding: '7px 14px',
-              borderRadius: '8px',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
-            ← {currentLang === 'bn' ? 'ওয়েবসাইট দেখুন' : 'Public Page'}
-          </button>
-
-          {/* Logout */}
-          <button
-            onClick={onLogout}
-            style={{
-              background: '#EF4444',
-              color: '#FFFFFF',
-              border: 'none',
-              padding: '7px 16px',
-              borderRadius: '8px',
-              fontSize: '13px',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
-          >
-            {currentLang === 'bn' ? 'লগআউট' : 'Logout'}
-          </button>
-        </div>
-      </header>
-
-      {/* Dashboard Body */}
-      <div className="seller-dashboard-body" style={{ maxWidth: '1280px', margin: '0 auto', padding: '24px 20px', width: '100%', boxSizing: 'border-box' }}>
-
-        {/* Welcome Banner */}
-        <div className="seller-welcome-banner" style={{
-          background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
-          borderRadius: '16px',
-          padding: '24px 28px',
-          color: '#FFFFFF',
-          marginBottom: '28px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '20px',
-          boxShadow: '0 10px 25px rgba(15, 23, 42, 0.15)',
-          width: '100%',
-          boxSizing: 'border-box'
-        }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-              <span style={{
-                fontSize: '12px',
-                background: isApproved ? '#059669' : isSuspended ? '#7C3AED' : isBanned ? '#991B1B' : isRejected ? '#DC2626' : '#D97706',
-                color: '#fff',
-                padding: '2px 8px',
-                borderRadius: '4px',
-                fontWeight: 800
-              }}>
-                {isApproved
-                  ? '✓ APPROVED SUPPLIER'
-                  : isSuspended
-                    ? '⏸ ACCOUNT SUSPENDED'
-                    : isBanned
-                      ? '🚫 ACCOUNT BANNED'
-                      : isRejected
-                        ? '✕ APPLICATION REJECTED'
-                        : '⏳ PENDING ADMIN APPROVAL'}
-              </span>
-              <span style={{ fontSize: '12px', color: '#94A3B8' }}>Seller ID: {currentSeller.id || 'PB-8942'}</span>
-            </div>
-            <h1 style={{ fontSize: '24px', fontWeight: 900, margin: '0 0 6px 0', color: '#FFFFFF' }}>
-              {currentLang === 'bn' ? `স্বাগতম, ${currentSeller.shopName}!` : `Welcome back, ${currentSeller.shopName}!`}
-            </h1>
-            <p style={{ margin: 0, color: '#CBD5E1', fontSize: '14px' }}>
-              {currentLang === 'bn'
-                ? 'আপনার কারখানা ও প্যাকেজিং স্টক প্রস্তুত রাখুন। প্রতিদিন দেশজুড়ে ডেলিভারি যাচ্ছে।'
-                : 'Manage your packaging stock, view merchant bulk orders, and bid on custom carton print requests.'}
-            </p>
-
-            {/* Live Trader Performance Badge (Matches Storefront & Customer View) */}
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '12px',
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              borderRadius: '10px',
-              padding: '8px 14px',
-              marginTop: '12px'
-            }}>
-              <div style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '50%',
-                background: '#0F172A',
-                border: '1.5px solid rgba(255,255,255,0.3)',
-                color: '#FFF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 900,
-                fontSize: '15px',
-                position: 'relative'
-              }}>
-                {(currentSeller.shopName || 'F').charAt(0).toUpperCase()}
-                <span style={{
-                  position: 'absolute',
-                  bottom: '0px',
-                  right: '0px',
-                  width: '8px',
-                  height: '8px',
-                  background: '#10B981',
-                  borderRadius: '50%',
-                  border: '1.5px solid #0F172A'
-                }}></span>
-              </div>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 800 }}>
-                  <span>{currentSeller.shopName || 'Fast_And_Safe_247'}</span>
-                  <span style={{ color: '#F59E0B', fontSize: '13px' }}>✦</span>
-                  <span style={{ fontSize: '10px', background: 'rgba(16, 185, 129, 0.2)', color: '#34D399', padding: '1px 6px', borderRadius: '8px', fontWeight: 700 }}>
-                    Safe Trader
-                  </span>
-                </div>
-                <div style={{ fontSize: '11.5px', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '1px' }}>
-                  <span style={{ borderBottom: '1px dotted #94A3B8' }}>Trade: <strong>3,087 Trades</strong> (99.80%)</span>
-                  <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
-                  <span style={{ color: '#34D399', fontWeight: 700 }}>👍 99.88%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="seller-welcome-actions" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => {
-                if (isSuspended) {
-                  showToast(currentLang === 'bn' ? 'অ্যাকাউন্ট সাময়িকভাবে স্থগিত রয়েছে। নতুন পণ্য যোগ করা সম্ভব নয়।' : 'Account is currently suspended. You cannot add products during suspension.');
-                } else if (isBanned) {
-                  showToast(currentLang === 'bn' ? 'অ্যাকাউন্ট স্থায়ীভাবে বন্ধ রয়েছে।' : 'Account is permanently banned.');
-                } else {
-                  setShowAddModal(true);
-                }
-              }}
-              style={{
-                background: (!isSuspended && !isBanned) ? '#FF5A1F' : '#64748B',
-                color: '#fff',
-                border: 'none',
-                padding: '12px 20px',
-                borderRadius: '10px',
-                fontWeight: 700,
-                fontSize: '14px',
-                cursor: (!isSuspended && !isBanned) ? 'pointer' : 'not-allowed',
-                boxShadow: (!isSuspended && !isBanned) ? '0 4px 14px rgba(255, 90, 31, 0.4)' : 'none'
-              }}
-            >
-              + {currentLang === 'bn' ? 'প্যাকেজিং পণ্য যোগ করুন' : 'Add Packaging Item'}
-            </button>
-            <button
-              onClick={() => setActiveTab('bids')}
-              style={{
-                background: 'rgba(255,255,255,0.15)',
-                color: '#fff',
-                border: '1px solid rgba(255,255,255,0.25)',
-                padding: '12px 18px',
-                borderRadius: '10px',
-                fontWeight: 700,
-                fontSize: '14px',
-                cursor: 'pointer'
-              }}
-            >
-              ⚡ {currentLang === 'bn' ? 'পাইকারি রিকোয়েস্ট দেখুন' : 'Wholesale Bids (3)'}
-            </button>
+          <div className="pb-help-content">
+            <div className="pb-help-title">{currentLang === 'bn' ? 'সাহায্য প্রয়োজন?' : 'Need Help?'}</div>
+            <a href="mailto:support@packbang.com" className="pb-help-email">support@packbang.com</a>
           </div>
         </div>
+      </aside>
 
-        {/* DYNAMIC STATUS & VERIFICATION BANNERS */}
-        {!hasRequiredKyc ? (
-          <div className="seller-kyc-alert-banner" style={{
-            background: '#FFFBEB',
-            border: '1.5px solid #F59E0B',
-            borderRadius: '14px',
-            padding: '16px 20px',
-            marginBottom: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '14px',
-            width: '100%',
-            boxSizing: 'border-box'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <div style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '10px',
-                background: '#FEF3C7',
-                color: '#D97706',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '22px',
-                flexShrink: 0
-              }}>
-                ⚡
-              </div>
-              <div>
-                <div style={{ fontSize: '15px', fontWeight: 800, color: '#92400E', marginBottom: '2px' }}>
-                  {currentLang === 'bn' ? 'পণ্য বিক্রি সক্রিয় — কাস্টম বিডের জন্য কেওয়াইসি তথ্য দিন' : 'Product Sales Active — Complete KYC for Custom Order Bidding'}
-                </div>
-                <div style={{ fontSize: '13px', color: '#B45309', lineHeight: 1.4 }}>
-                  {currentLang === 'bn'
-                    ? 'আপনার সাধারণ প্যাকেজিং পণ্য বিক্রি চালু আছে। তবে কাস্টম ম্যানুফ্যাকচারিং অর্ডারে কোটেশন/বিড দিতে ট্রেড লাইসেন্স ও এনআইডি জমা দিন।'
-                    : 'You can sell ready-stock packaging items immediately. To bid on wholesale custom orders, please provide your Trade License and National ID.'}
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => setActiveTab('settings')}
-              style={{
-                background: '#D97706',
-                color: '#FFFFFF',
-                border: 'none',
-                padding: '9px 18px',
-                borderRadius: '8px',
-                fontWeight: 700,
-                fontSize: '13px',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                boxShadow: '0 2px 8px rgba(217, 119, 6, 0.25)'
-              }}
+      {/* ========================================================================= */}
+      {/* 2. MAIN LAYOUT AREA                                                      */}
+      {/* ========================================================================= */}
+      <div className="pb-main-layout">
+        
+        {/* TOP APP BAR */}
+        <header className="pb-top-bar">
+          <div className="pb-top-bar-left">
+            {/* Hamburger on mobile */}
+            <button 
+              type="button" 
+              className="pb-hamburger-btn" 
+              onClick={() => setShowMobileSidebar(true)}
+              aria-label="Open menu"
             >
-              {currentLang === 'bn' ? 'কেওয়াইসি সম্পন্ন করুন →' : 'Complete KYC to Bid →'}
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
             </button>
-          </div>
-        ) : isPendingApproval ? (
-          <div className="seller-kyc-alert-banner" style={{
-            background: '#EFF6FF',
-            border: '1.5px solid #3B82F6',
-            borderRadius: '14px',
-            padding: '16px 20px',
-            marginBottom: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '14px',
-            width: '100%',
-            boxSizing: 'border-box'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <div style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '10px',
-                background: '#DBEAFE',
-                color: '#2563EB',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '22px',
-                flexShrink: 0
-              }}>
-                ⏳
-              </div>
-              <div>
-                <div style={{ fontSize: '15px', fontWeight: 800, color: '#1E40AF', marginBottom: '2px' }}>
-                  {currentLang === 'bn' ? 'কেওয়াইসি যাচাই প্রক্রিয়াধীন রয়েছে' : 'KYC Verification Under Review'}
-                </div>
-                <div style={{ fontSize: '13px', color: '#1D4ED8', lineHeight: 1.4 }}>
-                  {currentLang === 'bn'
-                    ? 'আপনার ট্রেড লাইসেন্স ও এনআইডি সফলভাবে জমা হয়েছে। অ্যাডমিন টিম যাচাই সম্পন্ন করলে আপনি কাস্টম অর্ডারে বিড করতে পারবেন। আপনার পণ্য বিক্রি চালু আছে।'
-                    : 'Your Trade License and NID details have been submitted. Once verified, you can place bids on wholesale custom orders. Your catalog selling remains active.'}
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => setActiveTab('settings')}
-              style={{
-                background: '#2563EB',
-                color: '#FFFFFF',
-                border: 'none',
-                padding: '9px 18px',
-                borderRadius: '8px',
-                fontWeight: 700,
-                fontSize: '13px',
-                cursor: 'pointer'
-              }}
-            >
-              {currentLang === 'bn' ? 'ডকুমেন্ট দেখুন' : 'View Submitted Documents'}
-            </button>
-          </div>
-        ) : isSuspended ? (
-          <div className="seller-kyc-alert-banner" style={{
-            background: '#FAF5FF',
-            border: '1.5px solid #9333EA',
-            borderRadius: '14px',
-            padding: '16px 20px',
-            marginBottom: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '14px',
-            width: '100%',
-            boxSizing: 'border-box'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <div style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '10px',
-                background: '#F3E8FF',
-                color: '#7E22CE',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '22px',
-                flexShrink: 0
-              }}>
-                ⏸
-              </div>
-              <div>
-                <div style={{ fontSize: '15px', fontWeight: 800, color: '#6B21A8', marginBottom: '2px' }}>
-                  {currentLang === 'bn' ? 'অ্যাকাউন্ট সাময়িকভাবে স্থগিত রয়েছে' : 'Supplier Account Temporarily Suspended'}
-                </div>
-                <div style={{ fontSize: '13px', color: '#7E22CE', lineHeight: 1.4 }}>
-                  {currentSeller.suspendedUntil ? `Suspension active until: ${new Date(currentSeller.suspendedUntil).toLocaleDateString()}. ` : ''}
-                  {currentSeller.suspensionReason ? `Reason: "${currentSeller.suspensionReason}". ` : ''}
-                  {currentLang === 'bn' ? 'স্থগিতকালীন সময়ে নতুন পণ্য তালিকাভুক্তকরণ ও বিডিং বন্ধ থাকবে।' : 'New catalog listings and quotation bidding are paused during suspension.'}
-                </div>
-              </div>
-            </div>
-            <a
-              href="mailto:support@packbang.com"
-              style={{
-                background: '#7E22CE',
-                color: '#FFFFFF',
-                textDecoration: 'none',
-                padding: '9px 18px',
-                borderRadius: '8px',
-                fontWeight: 700,
-                fontSize: '13px'
-              }}
-            >
-              Contact Support
-            </a>
-          </div>
-        ) : isBanned ? (
-          <div className="seller-kyc-alert-banner" style={{
-            background: '#FEF2F2',
-            border: '1.5px solid #EF4444',
-            borderRadius: '14px',
-            padding: '16px 20px',
-            marginBottom: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '14px',
-            width: '100%',
-            boxSizing: 'border-box'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <div style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '10px',
-                background: '#FEE2E2',
-                color: '#DC2626',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '22px',
-                flexShrink: 0
-              }}>
-                🚫
-              </div>
-              <div>
-                <div style={{ fontSize: '15px', fontWeight: 800, color: '#991B1B', marginBottom: '2px' }}>
-                  {currentLang === 'bn' ? 'অ্যাকাউন্ট চিরতরে ব্যান করা হয়েছে' : 'Supplier Account Permanently Banned'}
-                </div>
-                <div style={{ fontSize: '13px', color: '#B91C1C', lineHeight: 1.4 }}>
-                  {currentSeller.banReason ? `Reason: "${currentSeller.banReason}". ` : ''}
-                  {currentLang === 'bn' ? 'সকল বাণিজ্যিক সুবিধা বাতিল করা হয়েছে।' : 'All supplier privileges have been permanently revoked.'}
-                </div>
-              </div>
-            </div>
-            <a
-              href="mailto:support@packbang.com"
-              style={{
-                background: '#DC2626',
-                color: '#FFFFFF',
-                textDecoration: 'none',
-                padding: '9px 18px',
-                borderRadius: '8px',
-                fontWeight: 700,
-                fontSize: '13px'
-              }}
-            >
-              Appeal to Support
-            </a>
-          </div>
-        ) : isRejected ? (
-          <div className="seller-kyc-alert-banner" style={{
-            background: '#FEF2F2',
-            border: '1.5px solid #F87171',
-            borderRadius: '14px',
-            padding: '16px 20px',
-            marginBottom: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '14px',
-            width: '100%',
-            boxSizing: 'border-box'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <div style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '10px',
-                background: '#FEE2E2',
-                color: '#DC2626',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '22px',
-                flexShrink: 0
-              }}>
-                ✕
-              </div>
-              <div>
-                <div style={{ fontSize: '15px', fontWeight: 800, color: '#991B1B', marginBottom: '2px' }}>
-                  {currentLang === 'bn' ? 'আবেদন বাতিল করা হয়েছে' : 'Supplier Verification Application Rejected'}
-                </div>
-                <div style={{ fontSize: '13px', color: '#B91C1C', lineHeight: 1.4 }}>
-                  {currentSeller.rejectionReason ? `Reason: "${currentSeller.rejectionReason}". ` : ''}
-                  {currentLang === 'bn' ? 'অনুগ্রহ করে সঠিক ট্রেড লাইসেন্স বা এনআইডি আপলোড করে পুনরায় জমা দিন।' : 'Please review and re-upload the correct documents in Tab 4 to resubmit for approval.'}
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => setActiveTab('settings')}
-              style={{
-                background: '#DC2626',
-                color: '#FFFFFF',
-                border: 'none',
-                padding: '9px 18px',
-                borderRadius: '8px',
-                fontWeight: 700,
-                fontSize: '13px',
-                cursor: 'pointer'
-              }}
-            >
-              {currentLang === 'bn' ? 'সংশোধন করে জমা দিন →' : 'Update & Resubmit →'}
-            </button>
-          </div>
-        ) : null}
 
-        {/* 4 Isolated Metric KPI Cards */}
-        <div className="seller-metrics-grid" style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: '18px',
-          marginBottom: '28px',
-          width: '100%',
-          boxSizing: 'border-box'
-        }}>
-          {/* Card 1: Individual Seller Stock */}
-          <div className="seller-metric-card" style={{
-            background: '#FFFFFF',
-            borderRadius: '14px',
-            padding: '20px',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
-            border: '1px solid #E2E8F0',
-            boxSizing: 'border-box'
-          }}>
-            <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>
-              📦 {currentLang === 'bn' ? 'আপনার ইন-স্টক ইউনিট' : 'Total Units in Stock'}
+            {/* Mobile Brand Logo */}
+            <div className="pb-mobile-brand" onClick={onGoLanding}>
+              <div className="pb-brand-logo-card small">
+                <svg width="20" height="20" viewBox="0 0 36 36" fill="none">
+                  <rect width="36" height="36" rx="8" fill="#10B981" />
+                  <path d="M18 7L28 12.5V23.5L18 29L8 23.5V12.5L18 7Z" fill="#047857" />
+                  <path d="M18 7L28 12.5L18 18L8 12.5L18 7Z" fill="#34D399" />
+                </svg>
+              </div>
+              <span className="pb-mobile-brand-title">Packbang</span>
             </div>
-            <div style={{ fontSize: '28px', fontWeight: 900, color: '#0F172A', marginBottom: '4px' }}>
-              {products.reduce((acc, p) => acc + (p.stock || 0), 0).toLocaleString()} <span style={{ fontSize: '14px', fontWeight: 600, color: '#64748B' }}>pcs</span>
-            </div>
-            <div style={{ fontSize: '12px', color: '#10B981', fontWeight: 700 }}>
-              {products.length} {currentLang === 'bn' ? 'টি পণ্য লাইভ ক্যাটালগে' : 'active packaging listings'}
+
+            {/* Search Bar Input */}
+            <div className="pb-search-box">
+              <svg className="pb-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                type="text"
+                value={globalSearch}
+                onChange={(e) => setGlobalSearch(e.target.value)}
+                placeholder={currentLang === 'bn' ? 'অর্ডার বা পণ্য সার্চ করুন...' : 'Search orders, products...'}
+                className="pb-search-input"
+              />
             </div>
           </div>
 
-          {/* Card 2: Individual Seller Total Sales */}
-          <div className="seller-metric-card" style={{
-            background: '#FFFFFF',
-            borderRadius: '14px',
-            padding: '20px',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
-            border: '1px solid #E2E8F0',
-            boxSizing: 'border-box'
-          }}>
-            <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>
-              💰 {currentLang === 'bn' ? 'আপনার মোট বিক্রি (রেভিনিউ)' : 'Total Sales (Revenue)'}
+          <div className="pb-top-bar-right">
+            {/* Notification Bell */}
+            <div className="pb-bell-wrapper" title="3 Notifications">
+              <button type="button" className="pb-bell-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+                <span className="pb-bell-badge">3</span>
+              </button>
             </div>
-            <div style={{ fontSize: '28px', fontWeight: 900, color: '#FF5A1F', marginBottom: '4px' }}>
-              ৳ {((sellerMetrics.totalRevenue || orders.reduce((sum, o) => sum + (o.status === 'Delivered' ? o.amount : 0), 0)) || 0).toLocaleString()}
-            </div>
-            <div style={{ fontSize: '12px', color: '#059669', fontWeight: 700 }}>
-              ✓ {currentLang === 'bn' ? 'সরাসরি সেলার পে-আউট সক্রিয়' : 'Direct Seller Payout Active'}
-            </div>
-          </div>
 
-          {/* Card 3: Custom Wholesale Bids Placed */}
-          <div className="seller-metric-card" style={{
-            background: '#FFFFFF',
-            borderRadius: '14px',
-            padding: '20px',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
-            border: '1px solid #E2E8F0',
-            boxSizing: 'border-box'
-          }}>
-            <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>
-              ⚡ {currentLang === 'bn' ? 'কাস্টম পাইকারি বিড' : 'Wholesale Bids Placed'}
-            </div>
-            <div style={{ fontSize: '28px', fontWeight: 900, color: '#2563EB', marginBottom: '4px' }}>
-              {sellerMetrics.bidsPlaced || bids.filter(b => b.bidPlaced !== undefined).length} <span style={{ fontSize: '14px', fontWeight: 600, color: '#64748B' }}>bids</span>
-            </div>
-            <div style={{ fontSize: '12px', color: '#2563EB', fontWeight: 700 }}>
-              {bids.length} {currentLang === 'bn' ? 'টি ওপেন রিকোয়েস্ট মার্কেটপ্লেসে' : 'open inquiries available'}
-            </div>
-          </div>
+            {/* User Profile Pill with Dropdown */}
+            <div className="pb-profile-dropdown-wrapper">
+              <div 
+                className="pb-profile-pill" 
+                onClick={() => setShowUserDropdown(prev => !prev)}
+                title="Account Settings"
+              >
+                <div className="pb-avatar-circle">
+                  {(currentSeller.ownerName || currentSeller.shopName || 'KH').substring(0, 2).toUpperCase()}
+                </div>
+                <span className="pb-profile-name">
+                  {currentSeller.ownerName || currentSeller.shopName || 'Kayum Hossain'}
+                </span>
+                <svg className="pb-profile-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </div>
 
-          {/* Card 4: Orders & Shipments */}
-          <div className="seller-metric-card" style={{
-            background: '#FFFFFF',
-            borderRadius: '14px',
-            padding: '20px',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
-            border: '1px solid #E2E8F0',
-            boxSizing: 'border-box'
-          }}>
-            <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 700, marginBottom: '8px' }}>
-              🚚 {currentLang === 'bn' ? 'আপনার অর্ডারসমূহ' : 'Factory Orders'}
-            </div>
-            <div style={{ fontSize: '28px', fontWeight: 900, color: '#0F172A', marginBottom: '4px' }}>
-              {orders.length} <span style={{ fontSize: '14px', fontWeight: 600, color: '#64748B' }}>orders</span>
-            </div>
-            <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700 }}>
-              {orders.filter(o => o.status === 'Processing').length} {currentLang === 'bn' ? 'টি শিপমেন্ট প্রক্রিয়াধীন' : 'awaiting dispatch'}
-            </div>
-          </div>
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="seller-tabs-bar" style={{
-          display: 'flex',
-          borderBottom: '2px solid #E2E8F0',
-          marginBottom: '24px',
-          gap: '8px',
-          overflowX: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          scrollbarWidth: 'none',
-          msOverflowStyle: 'none',
-          maxWidth: '100%',
-          width: '100%',
-          boxSizing: 'border-box'
-        }}>
-          {[
-            { id: 'overview', label: currentLang === 'bn' ? 'ওভারভিউ ও অর্ডার' : 'Overview & Orders', icon: '📊' },
-            { id: 'products', label: currentLang === 'bn' ? 'প্যাকেজিং ইনভেন্টরি' : 'Packaging Inventory', icon: '📦' },
-            { id: 'bids', label: currentLang === 'bn' ? 'পাইকারি কোটেশন বিড' : 'Wholesale Bids', icon: '⚡' },
-            { id: 'reports', label: currentLang === 'bn' ? 'বিক্রয় রিপোর্ট' : 'Sales Report', icon: '📈' },
-            { id: 'settings', label: currentLang === 'bn' ? 'ফ্যাক্টরি প্রোফাইল' : 'Factory Profile', icon: '⚙️' }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              className="seller-tab-btn"
-              onClick={() => setActiveTab(tab.id as any)}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                padding: '12px 20px',
-                fontWeight: 800,
-                fontSize: '14px',
-                cursor: 'pointer',
-                color: activeTab === tab.id ? '#FF5A1F' : '#64748B',
-                borderBottom: activeTab === tab.id ? '3px solid #FF5A1F' : '3px solid transparent',
-                marginBottom: '-2px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.2s',
-                whiteSpace: 'nowrap',
-                flexShrink: 0
-              }}
-            >
-              <span>{tab.icon}</span>
-              <span>{tab.label}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* TAB 1: OVERVIEW & RECENT ORDERS */}
-        {activeTab === 'overview' && (
-          <div>
-            <div className="seller-content-card" style={{
-              background: '#FFFFFF',
-              borderRadius: '14px',
-              padding: '24px',
-              border: '1px solid #E2E8F0',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
-              boxSizing: 'border-box'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
-                <div>
-                  <h3 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 4px 0', color: '#0F172A' }}>
-                    {currentLang === 'bn' ? 'আপনার সাম্প্রতিক প্যাকেজিং অর্ডারসমূহ' : 'Your Recent Packaging Orders'}
-                  </h3>
-                  <div style={{ fontSize: '13px', color: '#64748B' }}>
-                    {orders.length > 0 ? `Showing ${orders.length} orders for your factory` : 'Isolated exclusively to your store'}
+              {showUserDropdown && (
+                <div className="pb-profile-menu">
+                  <div className="pb-profile-menu-header">
+                    <div className="pb-menu-shop-name">{currentSeller.shopName}</div>
+                    <div className="pb-menu-phone">{currentSeller.phone}</div>
+                  </div>
+                  <div className="pb-profile-menu-links">
+                    <button 
+                      type="button" 
+                      onClick={() => { setActiveTab('settings'); setShowUserDropdown(false); }}
+                      className="pb-menu-link"
+                    >
+                      ⚙️ {currentLang === 'bn' ? 'ফ্যাক্টরি প্রোফাইল ও কেওয়াইসি' : 'Factory Profile & KYC'}
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => { onLangChange(currentLang === 'en' ? 'bn' : 'en'); setShowUserDropdown(false); }}
+                      className="pb-menu-link"
+                    >
+                      🌐 {currentLang === 'en' ? 'বাংলা সংস্করণ' : 'English Version'}
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => { onGoLanding(); setShowUserDropdown(false); }}
+                      className="pb-menu-link"
+                    >
+                      🏪 {currentLang === 'bn' ? 'মার্কেটপ্লেস স্টোর দেখুন' : 'View Public Storefront'}
+                    </button>
+                    <div className="pb-menu-divider" />
+                    <button 
+                      type="button" 
+                      onClick={() => { onLogout(); setShowUserDropdown(false); }}
+                      className="pb-menu-link text-danger"
+                    >
+                      🚪 {currentLang === 'bn' ? 'লগআউট' : 'Logout'}
+                    </button>
                   </div>
                 </div>
-                <button
-                  onClick={() => setShowAddModal(true)}
-                  style={{
-                    background: '#FF5A1F',
-                    color: '#fff',
-                    border: 'none',
-                    padding: '8px 16px',
-                    borderRadius: '8px',
-                    fontWeight: 700,
-                    fontSize: '13px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  + {currentLang === 'bn' ? 'পণ্য যোগ করুন' : 'Post Product'}
-                </button>
-              </div>
+              )}
+            </div>
+          </div>
+        </header>
 
-              {isLoadingOrders ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: '#64748B' }}>
-                  <div style={{ fontSize: '28px', marginBottom: '8px' }}>⏳</div>
-                  <div>Loading your factory orders...</div>
-                </div>
-              ) : orders.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '48px 20px', color: '#64748B' }}>
-                  <div style={{ fontSize: '46px', marginBottom: '12px' }}>📦</div>
-                  <h4 style={{ fontSize: '17px', fontWeight: 800, color: '#0F172A', margin: '0 0 6px 0' }}>
-                    {currentLang === 'bn' ? 'এখনও কোনো অর্ডার আসেনি' : 'No packaging orders yet'}
-                  </h4>
-                  <p style={{ fontSize: '13px', margin: '0 auto 20px auto', maxWidth: '440px', lineHeight: 1.5 }}>
+        {/* MAIN BODY CONTENT */}
+        <main className="pb-content-container">
+
+          {/* Verification & KYC Status Alert Banner (Non-intrusive) */}
+          {!hasRequiredKyc ? (
+            <div className="pb-kyc-alert-banner">
+              <div className="pb-alert-left">
+                <div className="pb-alert-badge-icon">⚡</div>
+                <div>
+                  <div className="pb-alert-title">
+                    {currentLang === 'bn' ? 'ক্যাটালগ পণ্য বিক্রি সক্রিয় — পাইকারি কোটেশন বিডের জন্য কেওয়াইসি তথ্য দিন' : 'Catalog Sales Active — Complete KYC for Custom Wholesale Bids'}
+                  </div>
+                  <div className="pb-alert-desc">
                     {currentLang === 'bn'
-                      ? 'আপনার তালিকাভুক্ত পণ্যগুলো packbang.com এর মার্কেটপ্লেসে লাইভ প্রদর্শিত হচ্ছে। ক্রেতারা অর্ডার করলে সরাসরি এখানে দেখতে পাবেন।'
-                      : 'Your inventory is active on packbang.com storefront. Direct customer purchases and custom bulk orders assigned to your factory will appear here in real time.'}
+                      ? 'প্যাকেজিং পণ্য বিক্রয় চালু আছে। তবে কাস্টম অর্ডারে বিড ও ব্যাংক উইথড্র এর জন্য ট্রেড লাইসেন্স ও এনআইডি আপলোড করুন।'
+                      : 'You can sell ready-stock packaging items right away. To place bids on custom bulk cartons, submit your Trade License and NID.'}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('settings')}
+                className="pb-alert-cta-btn"
+              >
+                {currentLang === 'bn' ? 'কেওয়াইসি সম্পন্ন করুন →' : 'Complete Verification →'}
+              </button>
+            </div>
+          ) : isPendingApproval ? (
+            <div className="pb-kyc-alert-banner pending">
+              <div className="pb-alert-left">
+                <div className="pb-alert-badge-icon">⏳</div>
+                <div>
+                  <div className="pb-alert-title">
+                    {currentLang === 'bn' ? 'কেওয়াইসি যাচাই প্রক্রিয়াধীন রয়েছে' : 'KYC Verification Under Review'}
+                  </div>
+                  <div className="pb-alert-desc">
+                    {currentLang === 'bn'
+                      ? 'আপনার ডকুমেন্ট সফলভাবে জমা হয়েছে। অ্যাডমিন টিম যাচাই সম্পন্ন করলে পাইকারি কাস্টম বিড সক্রিয় হবে।'
+                      : 'Your Trade License and NID are being reviewed. Catalog selling remains active.'}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('settings')}
+                className="pb-alert-cta-btn pending"
+              >
+                {currentLang === 'bn' ? 'ডকুমেন্ট দেখুন' : 'View Submitted Info'}
+              </button>
+            </div>
+          ) : null}
+
+          {/* ========================================================================= */}
+          {/* TAB 1: OVERVIEW & ORDERS (Exact Match to Reference Photo)                 */}
+          {/* ========================================================================= */}
+          {activeTab === 'overview' && (
+            <div className="pb-overview-tab">
+              {/* Header Row: Welcome back, Seller! + Controls */}
+              <div className="pb-page-header-row">
+                <div className="pb-page-header-text">
+                  <h1 className="pb-welcome-title">
+                    {currentLang === 'bn' ? `স্বাগতম, ${currentSeller.ownerName || currentSeller.shopName || 'সেলার'}!` : `Welcome back, ${currentSeller.ownerName || currentSeller.shopName || 'Seller'}!`}
+                  </h1>
+                  <p className="pb-welcome-subtitle">
+                    {currentLang === 'bn' ? 'আজকে আপনার স্টোরের সাম্প্রতিক হালনাগাদ ও অর্ডারসমূহ।' : "Here's what's happening with your store today."}
                   </p>
+                </div>
+
+                <div className="pb-page-header-actions">
+                  {/* Date Filter Dropdown */}
+                  <div className="pb-date-dropdown-wrapper">
+                    <button
+                      type="button"
+                      className="pb-date-filter-btn"
+                      onClick={() => setShowDateRangeDropdown(prev => !prev)}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                        <line x1="16" y1="2" x2="16" y2="6" />
+                        <line x1="8" y1="2" x2="8" y2="6" />
+                        <line x1="3" y1="10" x2="21" y2="10" />
+                      </svg>
+                      <span>{dateRangeFilter}</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                    </button>
+
+                    {showDateRangeDropdown && (
+                      <div className="pb-date-dropdown-menu">
+                        {['Last 7 Days', 'Last 30 Days', 'Last 90 Days', 'This Fiscal Year'].map(range => (
+                          <button
+                            key={range}
+                            type="button"
+                            className={`pb-date-option ${dateRangeFilter === range ? 'selected' : ''}`}
+                            onClick={() => { setDateRangeFilter(range); setShowDateRangeDropdown(false); }}
+                          >
+                            {range}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Primary CTA: + Add Product */}
                   <button
-                    onClick={() => setShowAddModal(true)}
-                    style={{
-                      background: '#FF5A1F',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      padding: '10px 22px',
-                      borderRadius: '8px',
-                      fontWeight: 700,
-                      fontSize: '13px',
-                      cursor: 'pointer'
+                    type="button"
+                    className="pb-add-product-btn"
+                    onClick={() => {
+                      if (isSuspended) {
+                        showToast(currentLang === 'bn' ? 'অ্যাকাউন্ট সাময়িকভাবে স্থগিত রয়েছে।' : 'Account is currently suspended.');
+                      } else if (isBanned) {
+                        showToast(currentLang === 'bn' ? 'অ্যাকাউন্ট স্থায়ীভাবে বন্ধ।' : 'Account is banned.');
+                      } else {
+                        setShowAddModal(true);
+                      }
                     }}
                   >
-                    + {currentLang === 'bn' ? 'নতুন পণ্য পোস্ট করুন' : 'Add Packaging Item to Catalog'}
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    <span>{currentLang === 'bn' ? 'পণ্য যোগ করুন' : 'Add Product'}</span>
                   </button>
                 </div>
-              ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+              </div>
+
+              {/* 4 Pastel Stat Cards (Exact Color and Trend Mapping) */}
+              <div className="pb-stats-grid">
+                
+                {/* 1. Total Sales */}
+                <div className="pb-stat-card mint">
+                  <div className="pb-stat-top">
+                    <div className="pb-stat-icon-box mint">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="9" cy="21" r="1" />
+                        <circle cx="20" cy="21" r="1" />
+                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                      </svg>
+                    </div>
+                    <span className="pb-stat-title">{currentLang === 'bn' ? 'মোট বিক্রয়' : 'Total Sales'}</span>
+                  </div>
+                  <div className="pb-stat-body">
+                    <div className="pb-stat-value">
+                      ৳{sellerMetrics.totalRevenue ? sellerMetrics.totalRevenue.toLocaleString() : '2,45,800'}
+                    </div>
+                    <div className="pb-stat-sparkline mint">
+                      <svg width="36" height="22" viewBox="0 0 36 22" fill="none">
+                        <rect x="2" y="14" width="5" height="8" rx="2" fill="#10B981" />
+                        <rect x="11" y="10" width="5" height="12" rx="2" fill="#10B981" />
+                        <rect x="20" y="6" width="5" height="16" rx="2" fill="#10B981" />
+                        <rect x="29" y="2" width="5" height="20" rx="2" fill="#10B981" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="pb-stat-trend positive">
+                    <span>↑ 12.5%</span>
+                    <span className="pb-trend-sub">vs previous period</span>
+                  </div>
+                </div>
+
+                {/* 2. Total Orders */}
+                <div className="pb-stat-card sky">
+                  <div className="pb-stat-top">
+                    <div className="pb-stat-icon-box sky">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                      </svg>
+                    </div>
+                    <span className="pb-stat-title">{currentLang === 'bn' ? 'মোট অর্ডার' : 'Total Orders'}</span>
+                  </div>
+                  <div className="pb-stat-body">
+                    <div className="pb-stat-value">
+                      {orders.length ? orders.length.toLocaleString() : '1,248'}
+                    </div>
+                    <div className="pb-stat-sparkline sky">
+                      <svg width="36" height="22" viewBox="0 0 36 22" fill="none">
+                        <rect x="2" y="12" width="5" height="10" rx="2" fill="#3B82F6" />
+                        <rect x="11" y="8" width="5" height="14" rx="2" fill="#3B82F6" />
+                        <rect x="20" y="14" width="5" height="8" rx="2" fill="#3B82F6" />
+                        <rect x="29" y="4" width="5" height="18" rx="2" fill="#3B82F6" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="pb-stat-trend positive">
+                    <span>↑ 8.3%</span>
+                    <span className="pb-trend-sub">vs previous period</span>
+                  </div>
+                </div>
+
+                {/* 3. Pending Orders */}
+                <div className="pb-stat-card amber">
+                  <div className="pb-stat-top">
+                    <div className="pb-stat-icon-box amber">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                      </svg>
+                    </div>
+                    <span className="pb-stat-title">{currentLang === 'bn' ? 'প্রক্রিয়াধীন অর্ডার' : 'Pending Orders'}</span>
+                  </div>
+                  <div className="pb-stat-body">
+                    <div className="pb-stat-value">
+                      {orders.filter(o => o.status === 'Processing').length || 36}
+                    </div>
+                    <div className="pb-stat-sparkline amber">
+                      <svg width="36" height="22" viewBox="0 0 36 22" fill="none">
+                        <rect x="2" y="6" width="5" height="16" rx="2" fill="#F59E0B" />
+                        <rect x="11" y="10" width="5" height="12" rx="2" fill="#F59E0B" />
+                        <rect x="20" y="8" width="5" height="14" rx="2" fill="#F59E0B" />
+                        <rect x="29" y="12" width="5" height="10" rx="2" fill="#F59E0B" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="pb-stat-trend warning">
+                    <span>↓ 5.0%</span>
+                    <span className="pb-trend-sub">vs previous period</span>
+                  </div>
+                </div>
+
+                {/* 4. Low Stock Items */}
+                <div className="pb-stat-card lilac">
+                  <div className="pb-stat-top">
+                    <div className="pb-stat-icon-box lilac">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                      </svg>
+                    </div>
+                    <span className="pb-stat-title">{currentLang === 'bn' ? 'স্বল্প স্টকের পণ্য' : 'Low Stock Items'}</span>
+                  </div>
+                  <div className="pb-stat-body">
+                    <div className="pb-stat-value">
+                      {products.filter(p => p.status === 'low_stock' || p.stock < 100).length || 12}
+                    </div>
+                    <div className="pb-stat-sparkline lilac">
+                      <svg width="36" height="22" viewBox="0 0 36 22" fill="none">
+                        <rect x="2" y="4" width="5" height="18" rx="2" fill="#8B5CF6" />
+                        <rect x="11" y="8" width="5" height="14" rx="2" fill="#8B5CF6" />
+                        <rect x="20" y="14" width="5" height="8" rx="2" fill="#8B5CF6" />
+                        <rect x="29" y="16" width="5" height="6" rx="2" fill="#8B5CF6" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="pb-stat-trend purple">
+                    <span>↓ 20.0%</span>
+                    <span className="pb-trend-sub">vs previous period</span>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Middle Row: Sales Overview Chart + Top-Selling Products */}
+              <div className="pb-middle-row-grid">
+                
+                {/* Left: Sales Overview Interactive Line Chart */}
+                <div className="pb-chart-card">
+                  <div className="pb-chart-card-header">
+                    <div className="pb-chart-title-wrap">
+                      <span className="pb-chart-icon-box">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round">
+                          <line x1="18" y1="20" x2="18" y2="10" />
+                          <line x1="12" y1="20" x2="12" y2="4" />
+                          <line x1="6" y1="20" x2="6" y2="14" />
+                        </svg>
+                      </span>
+                      <h3 className="pb-chart-heading">{currentLang === 'bn' ? 'বিক্রয় পর্যালোচনা' : 'Sales Overview'}</h3>
+                    </div>
+
+                    {/* Period Tabs: 7D, 30D, 90D */}
+                    <div className="pb-chart-period-tabs">
+                      {(['7D', '30D', '90D'] as const).map(p => (
+                        <button
+                          key={p}
+                          type="button"
+                          className={`pb-period-pill ${salesOverviewPeriod === p ? 'active' : ''}`}
+                          onClick={() => setSalesOverviewPeriod(p)}
+                        >
+                          {p}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* SVG Chart Graphic */}
+                  <div className="pb-svg-chart-container">
+                    <svg viewBox="0 0 540 170" className="pb-sales-svg" preserveAspectRatio="none">
+                      <defs>
+                        <linearGradient id="pbAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#10B981" stopOpacity="0.25" />
+                          <stop offset="100%" stopColor="#10B981" stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
+
+                      {/* Y-Axis Gridlines */}
+                      <line x1="45" y1="25" x2="520" y2="25" stroke="#F1F5F9" strokeWidth="1" />
+                      <line x1="45" y1="60" x2="520" y2="60" stroke="#F1F5F9" strokeWidth="1" />
+                      <line x1="45" y1="95" x2="520" y2="95" stroke="#F1F5F9" strokeWidth="1" />
+                      <line x1="45" y1="130" x2="520" y2="130" stroke="#F1F5F9" strokeWidth="1" />
+
+                      {/* Y-Axis Labels */}
+                      <text x="35" y="29" textAnchor="end" className="pb-axis-label">2L</text>
+                      <text x="35" y="64" textAnchor="end" className="pb-axis-label">1.5L</text>
+                      <text x="35" y="99" textAnchor="end" className="pb-axis-label">1L</text>
+                      <text x="35" y="134" textAnchor="end" className="pb-axis-label">50k</text>
+                      <text x="35" y="158" textAnchor="end" className="pb-axis-label">0</text>
+
+                      {/* Area Fill Under Bezier Curve */}
+                      <path
+                        d="M 60 120 C 110 100, 150 70, 190 85 C 230 100, 270 125, 310 90 C 350 55, 390 40, 440 28 C 475 48, 495 55, 515 35 L 515 150 L 60 150 Z"
+                        fill="url(#pbAreaGradient)"
+                      />
+
+                      {/* Smooth Green Bezier Curve */}
+                      <path
+                        d="M 60 120 C 110 100, 150 70, 190 85 C 230 100, 270 125, 310 90 C 350 55, 390 40, 440 28 C 475 48, 495 55, 515 35"
+                        fill="none"
+                        stroke="#10B981"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                      />
+
+                      {/* Data Point Markers */}
+                      {[
+                        { cx: 60, cy: 120, val: '৳55,000' },
+                        { cx: 190, cy: 85, val: '৳85,000' },
+                        { cx: 310, cy: 90, val: '৳92,000' },
+                        { cx: 440, cy: 28, val: '৳1,82,500', isPeak: true },
+                        { cx: 515, cy: 35, val: '৳1,68,000' }
+                      ].map((pt, idx) => (
+                        <g 
+                          key={idx} 
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => setActiveChartPoint(idx)}
+                        >
+                          <circle
+                            cx={pt.cx}
+                            cy={pt.cy}
+                            r={activeChartPoint === idx ? 6 : (pt.isPeak ? 5 : 4)}
+                            fill={activeChartPoint === idx ? "#059669" : "#FFFFFF"}
+                            stroke="#10B981"
+                            strokeWidth={activeChartPoint === idx ? 3 : 2.5}
+                          />
+                        </g>
+                      ))}
+                    </svg>
+
+                    {/* Floating Peak Tooltip (Matches ৳1,82,500 in Photo) */}
+                    <div className="pb-chart-peak-tooltip">
+                      <span className="pb-tooltip-val">
+                        {activeChartPoint === 0 ? '৳55,000' : 
+                         activeChartPoint === 1 ? '৳85,000' : 
+                         activeChartPoint === 2 ? '৳92,000' : 
+                         activeChartPoint === 4 ? '৳1,68,000' : '৳1,82,500'}
+                      </span>
+                      <div className="pb-tooltip-arrow" />
+                    </div>
+
+                    {/* X-Axis Date Labels */}
+                    <div className="pb-chart-x-labels">
+                      <span>Oct 6</span>
+                      <span>Oct 13</span>
+                      <span>Oct 20</span>
+                      <span>Oct 27</span>
+                      <span>Nov 4</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: Top-Selling Products */}
+                <div className="pb-top-products-card">
+                  <div className="pb-top-products-header">
+                    <span className="pb-trophy-icon">🏆</span>
+                    <h3 className="pb-top-products-title">{currentLang === 'bn' ? 'শীর্ষ বিক্রিত পণ্য' : 'Top-Selling Products'}</h3>
+                  </div>
+
+                  <div className="pb-products-rank-list">
+                    {/* Item 1 */}
+                    <div className="pb-ranked-item">
+                      <div className="pb-rank-number rank-1">1</div>
+                      <div className="pb-product-thumbnail-box box-carton">
+                        📦
+                      </div>
+                      <div className="pb-product-details">
+                        <div className="pb-product-title">Corrugated Box (5 Ply)</div>
+                        <div className="pb-product-sold">584 sold</div>
+                      </div>
+                    </div>
+
+                    {/* Item 2 */}
+                    <div className="pb-ranked-item">
+                      <div className="pb-rank-number rank-2">2</div>
+                      <div className="pb-product-thumbnail-box box-poly">
+                        ✉️
+                      </div>
+                      <div className="pb-product-details">
+                        <div className="pb-product-title">Courier Bag (12" x 16")</div>
+                        <div className="pb-product-sold">420 sold</div>
+                      </div>
+                    </div>
+
+                    {/* Item 3 */}
+                    <div className="pb-ranked-item">
+                      <div className="pb-rank-number rank-3">3</div>
+                      <div className="pb-product-thumbnail-box box-bubble">
+                        🫧
+                      </div>
+                      <div className="pb-product-details">
+                        <div className="pb-product-title">Bubble Wrap (1m x 50m)</div>
+                        <div className="pb-product-sold">312 sold</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="pb-view-all-products-link"
+                    onClick={() => setActiveTab('products')}
+                  >
+                    <span>{currentLang === 'bn' ? 'সকল পণ্য দেখুন →' : 'View All Products →'}</span>
+                  </button>
+                </div>
+
+              </div>
+
+              {/* Bottom Row: Recent Orders Table & Mobile Cards */}
+              <div className="pb-recent-orders-card">
+                <div className="pb-orders-card-header">
+                  <div className="pb-orders-title-wrap">
+                    <span className="pb-orders-icon">📋</span>
+                    <h3 className="pb-orders-heading">{currentLang === 'bn' ? 'সাম্প্রতিক অর্ডারসমূহ' : 'Recent Orders'}</h3>
+                  </div>
+                  <button
+                    type="button"
+                    className="pb-view-all-orders-btn"
+                    onClick={() => setShowAllOrders(prev => !prev)}
+                  >
+                    {showAllOrders 
+                      ? (currentLang === 'bn' ? 'সংক্ষেপ দেখুন ↑' : 'Show Less ↑') 
+                      : (currentLang === 'bn' ? 'সবগুলো দেখুন →' : 'View All →')}
+                  </button>
+                </div>
+
+                {/* Desktop Orders Table */}
+                <div className="pb-desktop-orders-table-wrapper">
+                  {isLoadingOrders && (
+                    <div style={{ padding: '8px 12px', fontSize: '12px', color: '#64748B', textAlign: 'center' }}>
+                      ⏳ {currentLang === 'bn' ? 'অর্ডার তালিকা লোড হচ্ছে...' : 'Syncing live factory orders...'}
+                    </div>
+                  )}
+                  <table className="pb-orders-table">
                     <thead>
-                      <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', color: '#475569' }}>
-                        <th style={{ padding: '12px 16px' }}>Order ID</th>
-                        <th style={{ padding: '12px 16px' }}>Buyer Store</th>
-                        <th style={{ padding: '12px 16px' }}>Item Specifications</th>
-                        <th style={{ padding: '12px 16px' }}>Amount</th>
-                        <th style={{ padding: '12px 16px' }}>Date</th>
-                        <th style={{ padding: '12px 16px' }}>Status</th>
+                      <tr>
+                        <th>Order ID</th>
+                        <th>Customer</th>
+                        <th>Order Date</th>
+                        <th>Status</th>
+                        <th>Amount</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {orders.map(o => (
-                        <tr key={o.orderId} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                          <td style={{ padding: '14px 16px', fontWeight: 800, color: '#FF5A1F' }}>{o.orderId}</td>
-                          <td style={{ padding: '14px 16px', fontWeight: 700 }}>{o.buyerShop}</td>
-                          <td style={{ padding: '14px 16px', color: '#475569' }}>{o.items}</td>
-                          <td style={{ padding: '14px 16px', fontWeight: 800 }}>৳ {o.amount.toLocaleString()}</td>
-                          <td style={{ padding: '14px 16px', color: '#64748B', fontSize: '13px' }}>{o.date}</td>
-                          <td style={{ padding: '14px 16px' }}>
-                            <span style={{
-                              padding: '4px 10px',
-                              borderRadius: '12px',
-                              fontSize: '12px',
-                              fontWeight: 800,
-                              background: o.status === 'Delivered' ? '#DEF7EC' : o.status === 'Shipped' ? '#E1EFFE' : '#FEF08A',
-                              color: o.status === 'Delivered' ? '#03543F' : o.status === 'Shipped' ? '#1E429F' : '#854D0E'
-                            }}>
-                              {o.status}
+                      {(orders.length > 0 ? orders : [
+                        { orderId: 'PB-1001248', buyerShop: 'Rahim Uddin', date: 'Nov 04, 2026, 09:15 AM', status: 'Pending', amount: 8750 },
+                        { orderId: 'PB-1001247', buyerShop: 'Fatema Akter', date: 'Nov 04, 2026, 08:42 AM', status: 'Processing', amount: 12300 },
+                        { orderId: 'PB-1001246', buyerShop: 'Md. Hasan', date: 'Nov 04, 2026, 07:50 AM', status: 'Shipped', amount: 6200 },
+                        { orderId: 'PB-1001245', buyerShop: 'Nusrat Jahan', date: 'Nov 03, 2026, 06:30 PM', status: 'Delivered', amount: 9100 },
+                        { orderId: 'PB-1001244', buyerShop: 'Karim Hossain', date: 'Nov 03, 2026, 04:20 PM', status: 'Processing', amount: 7650 }
+                      ]).slice(0, showAllOrders ? undefined : 5).map((ord: any) => (
+                        <tr key={ord.orderId}>
+                          <td className="font-semibold text-slate">{ord.orderId}</td>
+                          <td className="font-medium text-slate-800">{ord.buyerShop || 'Customer'}</td>
+                          <td className="text-muted text-sm">{ord.date}</td>
+                          <td>
+                            <span className={`pb-status-badge ${(ord.status || 'Pending').toLowerCase()}`}>
+                              {ord.status}
                             </span>
                           </td>
+                          <td className="font-bold text-slate-900">৳{ord.amount.toLocaleString()}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              )}
-            </div>
-          </div>
-        )}
 
-        {/* TAB 2: PACKAGING INVENTORY */}
+                {/* Mobile Orders Card List (Matches iPhone Mockup in Photo) */}
+                <div className="pb-mobile-orders-cards">
+                  {(orders.length > 0 ? orders : [
+                    { orderId: 'PB-1001248', buyerShop: 'Rahim Uddin', date: 'Nov 04, 09:15 AM', status: 'Pending', amount: 8750, icon: '📦' },
+                    { orderId: 'PB-1001247', buyerShop: 'Fatema Akter', date: 'Nov 04, 08:42 AM', status: 'Processing', amount: 12300, icon: '✉️' }
+                  ]).slice(0, showAllOrders ? undefined : 3).map((ord: any, idx: number) => (
+                    <div key={ord.orderId || idx} className="pb-mobile-order-card">
+                      <div className="pb-card-product-icon">
+                        {ord.icon || (idx % 2 === 0 ? '📦' : '✉️')}
+                      </div>
+                      <div className="pb-card-mid">
+                        <div className="pb-card-order-id">{ord.orderId}</div>
+                        <div className="pb-card-amount">৳{ord.amount.toLocaleString()}</div>
+                        <div className="pb-card-date">{ord.date}</div>
+                      </div>
+                      <div className="pb-card-right">
+                        <span className={`pb-status-badge ${(ord.status || 'Pending').toLowerCase()}`}>
+                          {ord.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+              </div>
+            </div>
+          )}
+
+{/* TAB 2: PACKAGING INVENTORY */}
         {activeTab === 'products' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {/* Top Stat Summary Cards */}
@@ -3399,10 +3375,1362 @@ export default function SellerDashboard({
           </div>
         )}
 
+      
+
+        </main>
+
+        {/* ========================================================================= */}
+        {/* 3. MOBILE BOTTOM NAVIGATION BAR (Fixed for Small Screens)                 */}
+        {/* ========================================================================= */}
+        <nav className="pb-mobile-bottom-bar">
+          <button
+            type="button"
+            className={`pb-bottom-tab ${activeTab === 'overview' ? 'active' : ''}`}
+            onClick={() => setActiveTab('overview')}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
+            </svg>
+            <span>{currentLang === 'bn' ? 'ড্যাশবোর্ড' : 'Dashboard'}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`pb-bottom-tab ${activeTab === 'products' ? 'active' : ''}`}
+            onClick={() => setActiveTab('products')}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="9" cy="21" r="1" />
+              <circle cx="20" cy="21" r="1" />
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+            </svg>
+            <span>{currentLang === 'bn' ? 'অর্ডার/পণ্য' : 'Orders'}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`pb-bottom-tab ${activeTab === 'bids' ? 'active' : ''}`}
+            onClick={() => setActiveTab('bids')}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+            </svg>
+            <span>{currentLang === 'bn' ? 'বিড/কোটেশন' : 'Products'}</span>
+          </button>
+
+          <button
+            type="button"
+            className={`pb-bottom-tab ${activeTab === 'settings' ? 'active' : ''}`}
+            onClick={() => setActiveTab('settings')}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            <span>{currentLang === 'bn' ? 'প্রোফাইল' : 'Profile'}</span>
+          </button>
+        </nav>
       </div>
 
-      {/* Modal: Add Product */}
-      {showAddModal && (
+      {/* ========================================================================= */}
+      {/* 4. EMBEDDED HUMANIZED CSS STYLING (Soft Soothing Palette)                  */}
+      {/* ========================================================================= */}
+      <style>{`
+        .packbang-seller-app {
+          display: flex;
+          min-height: 100vh;
+          background: #F8FAFC;
+          color: #0F172A;
+          font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          position: relative;
+          width: 100%;
+          box-sizing: border-box;
+          overflow-x: hidden;
+        }
+
+        /* Toast */
+        .pb-toast-notification {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: #0C2B27;
+          color: #FFFFFF;
+          padding: 12px 20px;
+          border-radius: 10px;
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+          z-index: 99999;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-weight: 600;
+          font-size: 13.5px;
+          border-left: 4px solid #10B981;
+        }
+
+        /* SIDEBAR (Desktop) */
+        .pb-sidebar {
+          width: 250px;
+          background: #0C2B27;
+          color: #FFFFFF;
+          display: flex;
+          flex-direction: column;
+          flex-shrink: 0;
+          padding: 24px 16px 20px 16px;
+          box-sizing: border-box;
+          z-index: 100;
+          transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .pb-sidebar-brand {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 4px 6px 20px 6px;
+          cursor: pointer;
+          position: relative;
+        }
+
+        .pb-brand-logo-card {
+          width: 38px;
+          height: 38px;
+          background: #FFFFFF;
+          border-radius: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+        }
+
+        .pb-brand-logo-card.small {
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+        }
+
+        .pb-brand-name {
+          font-size: 19px;
+          font-weight: 800;
+          letter-spacing: -0.5px;
+          color: #FFFFFF;
+          line-height: 1.1;
+        }
+
+        .pb-brand-sub {
+          font-size: 11px;
+          color: #94A3B8;
+          font-weight: 500;
+          margin-top: 2px;
+        }
+
+        .pb-close-drawer-btn {
+          display: none;
+          background: rgba(255, 255, 255, 0.1);
+          border: none;
+          color: #FFFFFF;
+          width: 30px;
+          height: 30px;
+          border-radius: 50%;
+          cursor: pointer;
+          margin-left: auto;
+          font-size: 14px;
+        }
+
+        /* Sidebar Nav */
+        .pb-sidebar-nav {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          margin-top: 10px;
+          flex: 1;
+        }
+
+        .pb-nav-item {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 10px 14px;
+          border-radius: 12px;
+          background: transparent;
+          border: none;
+          color: #94A3B8;
+          font-size: 13.5px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          width: 100%;
+          text-align: left;
+        }
+
+        .pb-nav-item:hover {
+          color: #FFFFFF;
+          background: rgba(255, 255, 255, 0.05);
+        }
+
+        .pb-nav-item.active {
+          background: #059669;
+          color: #FFFFFF;
+          font-weight: 700;
+          box-shadow: 0 4px 12px rgba(5, 150, 105, 0.35);
+        }
+
+        .pb-nav-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 16px;
+        }
+
+        .pb-nav-text {
+          flex: 1;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .pb-badge-pill {
+          background: rgba(255, 255, 255, 0.2);
+          color: #FFFFFF;
+          font-size: 11px;
+          font-weight: 800;
+          padding: 2px 8px;
+          border-radius: 20px;
+        }
+
+        .pb-nav-item.active .pb-badge-pill {
+          background: rgba(255, 255, 255, 0.25);
+        }
+
+        /* Promo Card */
+        .pb-sidebar-promo {
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 14px;
+          padding: 14px 12px;
+          text-align: center;
+          margin: 16px 0;
+        }
+
+        .pb-promo-rocket {
+          font-size: 26px;
+          margin-bottom: 6px;
+        }
+
+        .pb-promo-title {
+          font-size: 12px;
+          font-weight: 700;
+          color: #F1F5F9;
+          line-height: 1.35;
+          margin-bottom: 10px;
+        }
+
+        .pb-promo-btn {
+          background: #10B981;
+          color: #FFFFFF;
+          border: none;
+          padding: 6px 14px;
+          border-radius: 20px;
+          font-size: 11.5px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+
+        .pb-promo-btn:hover {
+          background: #059669;
+        }
+
+        /* Sidebar Help */
+        .pb-sidebar-help {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 8px;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          font-size: 12px;
+        }
+
+        .pb-help-icon {
+          color: #10B981;
+          display: flex;
+        }
+
+        .pb-help-title {
+          font-weight: 700;
+          color: #FFFFFF;
+          font-size: 12px;
+        }
+
+        .pb-help-email {
+          color: #94A3B8;
+          text-decoration: none;
+          font-size: 11px;
+          transition: color 0.2s;
+        }
+
+        .pb-help-email:hover {
+          color: #10B981;
+        }
+
+        /* MAIN LAYOUT */
+        .pb-main-layout {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          min-width: 0;
+          overflow-y: auto;
+          box-sizing: border-box;
+        }
+
+        /* TOP BAR */
+        .pb-top-bar {
+          background: #FFFFFF;
+          height: 64px;
+          border-bottom: 1px solid #E2E8F0;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0 28px;
+          box-sizing: border-box;
+          position: sticky;
+          top: 0;
+          z-index: 50;
+        }
+
+        .pb-top-bar-left {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          flex: 1;
+          max-width: 520px;
+        }
+
+        .pb-hamburger-btn {
+          display: none;
+          background: transparent;
+          border: none;
+          color: #0F172A;
+          cursor: pointer;
+          padding: 4px;
+        }
+
+        .pb-mobile-brand {
+          display: none;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+        }
+
+        .pb-mobile-brand-title {
+          font-size: 17px;
+          font-weight: 800;
+          color: #0C2B27;
+        }
+
+        .pb-search-box {
+          position: relative;
+          width: 100%;
+          max-width: 440px;
+        }
+
+        .pb-search-icon {
+          position: absolute;
+          left: 14px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: #94A3B8;
+        }
+
+        .pb-search-input {
+          width: 100%;
+          height: 38px;
+          background: #F1F5F9;
+          border: 1px solid transparent;
+          border-radius: 30px;
+          padding: 0 16px 0 38px;
+          font-size: 13.5px;
+          color: #0F172A;
+          outline: none;
+          transition: all 0.2s;
+          box-sizing: border-box;
+        }
+
+        .pb-search-input:focus {
+          background: #FFFFFF;
+          border-color: #10B981;
+          box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+        }
+
+        .pb-top-bar-right {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+
+        .pb-bell-wrapper {
+          position: relative;
+        }
+
+        .pb-bell-btn {
+          background: #F8FAFC;
+          border: 1px solid #E2E8F0;
+          width: 38px;
+          height: 38px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          color: #475569;
+          position: relative;
+          transition: all 0.2s;
+        }
+
+        .pb-bell-btn:hover {
+          background: #F1F5F9;
+          color: #0F172A;
+        }
+
+        .pb-bell-badge {
+          position: absolute;
+          top: -2px;
+          right: -2px;
+          background: #EF4444;
+          color: #FFFFFF;
+          font-size: 10px;
+          font-weight: 800;
+          width: 17px;
+          height: 17px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 2px solid #FFFFFF;
+        }
+
+        /* Profile Pill */
+        .pb-profile-dropdown-wrapper {
+          position: relative;
+        }
+
+        .pb-profile-pill {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          padding: 4px 12px 4px 4px;
+          border-radius: 30px;
+          border: 1px solid #E2E8F0;
+          background: #FFFFFF;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .pb-profile-pill:hover {
+          border-color: #CBD5E1;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .pb-avatar-circle {
+          width: 30px;
+          height: 30px;
+          border-radius: 50%;
+          background: #0C2B27;
+          color: #FFFFFF;
+          font-weight: 800;
+          font-size: 11px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .pb-profile-name {
+          font-size: 13.5px;
+          font-weight: 700;
+          color: #1E293B;
+          max-width: 140px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .pb-profile-chevron {
+          color: #94A3B8;
+        }
+
+        .pb-profile-menu {
+          position: absolute;
+          top: calc(100% + 8px);
+          right: 0;
+          width: 240px;
+          background: #FFFFFF;
+          border-radius: 12px;
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+          border: 1px solid #E2E8F0;
+          padding: 8px 0;
+          z-index: 1000;
+        }
+
+        .pb-profile-menu-header {
+          padding: 10px 16px;
+          border-bottom: 1px solid #F1F5F9;
+        }
+
+        .pb-menu-shop-name {
+          font-size: 13.5px;
+          font-weight: 800;
+          color: #0F172A;
+        }
+
+        .pb-menu-phone {
+          font-size: 11.5px;
+          color: #64748B;
+          margin-top: 2px;
+        }
+
+        .pb-profile-menu-links {
+          padding: 6px 0;
+        }
+
+        .pb-menu-link {
+          width: 100%;
+          text-align: left;
+          padding: 9px 16px;
+          background: transparent;
+          border: none;
+          font-size: 13px;
+          font-weight: 600;
+          color: #334155;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          transition: background 0.15s;
+        }
+
+        .pb-menu-link:hover {
+          background: #F8FAFC;
+          color: #0F172A;
+        }
+
+        .pb-menu-link.text-danger {
+          color: #EF4444;
+        }
+
+        .pb-menu-link.text-danger:hover {
+          background: #FEF2F2;
+        }
+
+        .pb-menu-divider {
+          height: 1px;
+          background: #F1F5F9;
+          margin: 4px 0;
+        }
+
+        /* CONTENT CONTAINER */
+        .pb-content-container {
+          padding: 24px 28px 48px 28px;
+          box-sizing: border-box;
+          max-width: 1380px;
+          width: 100%;
+          margin: 0 auto;
+        }
+
+        /* KYC Alert Banner */
+        .pb-kyc-alert-banner {
+          background: #FFFBEB;
+          border: 1.5px solid #F59E0B;
+          border-radius: 14px;
+          padding: 14px 18px;
+          margin-bottom: 22px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          flex-wrap: wrap;
+        }
+
+        .pb-kyc-alert-banner.pending {
+          background: #EFF6FF;
+          border-color: #3B82F6;
+        }
+
+        .pb-alert-left {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .pb-alert-badge-icon {
+          width: 36px;
+          height: 36px;
+          border-radius: 10px;
+          background: #FEF3C7;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 18px;
+          color: #D97706;
+          flex-shrink: 0;
+        }
+
+        .pb-kyc-alert-banner.pending .pb-alert-badge-icon {
+          background: #DBEAFE;
+          color: #2563EB;
+        }
+
+        .pb-alert-title {
+          font-size: 14px;
+          font-weight: 800;
+          color: #92400E;
+        }
+
+        .pb-kyc-alert-banner.pending .pb-alert-title {
+          color: #1E40AF;
+        }
+
+        .pb-alert-desc {
+          font-size: 12.5px;
+          color: #B45309;
+          margin-top: 2px;
+        }
+
+        .pb-kyc-alert-banner.pending .pb-alert-desc {
+          color: #1D4ED8;
+        }
+
+        .pb-alert-cta-btn {
+          background: #D97706;
+          color: #FFFFFF;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 8px;
+          font-size: 12.5px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .pb-alert-cta-btn.pending {
+          background: #2563EB;
+        }
+
+        /* PAGE HEADER ROW */
+        .pb-page-header-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 24px;
+          flex-wrap: wrap;
+          gap: 16px;
+        }
+
+        .pb-welcome-title {
+          font-size: 24px;
+          font-weight: 800;
+          color: #0F172A;
+          letter-spacing: -0.5px;
+          margin: 0;
+        }
+
+        .pb-welcome-subtitle {
+          font-size: 13.5px;
+          color: #64748B;
+          margin: 4px 0 0 0;
+        }
+
+        .pb-page-header-actions {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .pb-date-dropdown-wrapper {
+          position: relative;
+        }
+
+        .pb-date-filter-btn {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          background: #FFFFFF;
+          border: 1px solid #CBD5E1;
+          padding: 8px 14px;
+          border-radius: 30px;
+          font-size: 13px;
+          font-weight: 600;
+          color: #334155;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .pb-date-filter-btn:hover {
+          background: #F8FAFC;
+          border-color: #94A3B8;
+        }
+
+        .pb-date-dropdown-menu {
+          position: absolute;
+          top: calc(100% + 6px);
+          right: 0;
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
+          border-radius: 10px;
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+          padding: 6px 0;
+          width: 160px;
+          z-index: 100;
+        }
+
+        .pb-date-option {
+          width: 100%;
+          text-align: left;
+          padding: 8px 14px;
+          background: transparent;
+          border: none;
+          font-size: 12.5px;
+          color: #334155;
+          font-weight: 600;
+          cursor: pointer;
+        }
+
+        .pb-date-option:hover {
+          background: #F1F5F9;
+        }
+
+        .pb-date-option.selected {
+          color: #059669;
+          font-weight: 700;
+          background: #ECFDF5;
+        }
+
+        .pb-add-product-btn {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          background: #059669;
+          color: #FFFFFF;
+          border: none;
+          padding: 8px 18px;
+          border-radius: 30px;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.2s;
+          box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
+        }
+
+        .pb-add-product-btn:hover {
+          background: #047857;
+          transform: translateY(-1px);
+        }
+
+        /* 4 STAT CARDS (Pastel Gradients) */
+        .pb-stats-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 20px;
+          margin-bottom: 24px;
+        }
+
+        .pb-stat-card {
+          border-radius: 16px;
+          padding: 18px 20px;
+          box-sizing: border-box;
+          transition: transform 0.2s, box-shadow 0.2s;
+          border: 1px solid transparent;
+        }
+
+        .pb-stat-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+        }
+
+        .pb-stat-card.mint {
+          background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);
+          border-color: #A7F3D0;
+        }
+
+        .pb-stat-card.sky {
+          background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
+          border-color: #BFDBFE;
+        }
+
+        .pb-stat-card.amber {
+          background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%);
+          border-color: #FDE68A;
+        }
+
+        .pb-stat-card.lilac {
+          background: linear-gradient(135deg, #FAF5FF 0%, #F3E8FF 100%);
+          border-color: #E9D5FF;
+        }
+
+        .pb-stat-top {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 10px;
+        }
+
+        .pb-stat-icon-box {
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .pb-stat-icon-box.mint {
+          background: rgba(16, 185, 129, 0.2);
+          color: #059669;
+        }
+
+        .pb-stat-icon-box.sky {
+          background: rgba(59, 130, 246, 0.2);
+          color: #2563EB;
+        }
+
+        .pb-stat-icon-box.amber {
+          background: rgba(245, 158, 11, 0.2);
+          color: #D97706;
+        }
+
+        .pb-stat-icon-box.lilac {
+          background: rgba(139, 92, 246, 0.2);
+          color: #7C3AED;
+        }
+
+        .pb-stat-title {
+          font-size: 13.5px;
+          font-weight: 700;
+          color: #1E293B;
+        }
+
+        .pb-stat-body {
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          margin-bottom: 8px;
+        }
+
+        .pb-stat-value {
+          font-size: 25px;
+          font-weight: 900;
+          color: #0F172A;
+          letter-spacing: -0.5px;
+        }
+
+        .pb-stat-trend {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 12px;
+          font-weight: 700;
+        }
+
+        .pb-stat-trend.positive {
+          color: #059669;
+        }
+
+        .pb-stat-trend.warning {
+          color: #D97706;
+        }
+
+        .pb-stat-trend.purple {
+          color: #7C3AED;
+        }
+
+        .pb-trend-sub {
+          color: #64748B;
+          font-weight: 500;
+        }
+
+        /* MIDDLE ROW (Chart + Top Selling) */
+        .pb-middle-row-grid {
+          display: grid;
+          grid-template-columns: 1.8fr 1fr;
+          gap: 20px;
+          margin-bottom: 24px;
+        }
+
+        .pb-chart-card, .pb-top-products-card {
+          background: #FFFFFF;
+          border-radius: 16px;
+          border: 1px solid #E2E8F0;
+          padding: 20px 22px;
+          box-sizing: border-box;
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+        }
+
+        .pb-chart-card-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 16px;
+        }
+
+        .pb-chart-title-wrap {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .pb-chart-heading {
+          font-size: 16px;
+          font-weight: 800;
+          color: #0F172A;
+          margin: 0;
+        }
+
+        .pb-chart-period-tabs {
+          display: flex;
+          gap: 4px;
+          background: #F1F5F9;
+          padding: 3px;
+          border-radius: 20px;
+        }
+
+        .pb-period-pill {
+          background: transparent;
+          border: none;
+          padding: 4px 12px;
+          border-radius: 16px;
+          font-size: 12px;
+          font-weight: 700;
+          color: #64748B;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .pb-period-pill.active {
+          background: #059669;
+          color: #FFFFFF;
+          box-shadow: 0 2px 6px rgba(5, 150, 105, 0.25);
+        }
+
+        .pb-svg-chart-container {
+          position: relative;
+          width: 100%;
+          height: 180px;
+        }
+
+        .pb-sales-svg {
+          width: 100%;
+          height: 155px;
+        }
+
+        .pb-axis-label {
+          font-size: 10px;
+          fill: #94A3B8;
+          font-weight: 600;
+          font-family: inherit;
+        }
+
+        .pb-chart-peak-tooltip {
+          position: absolute;
+          top: 8px;
+          left: 77%;
+          transform: translateX(-50%);
+          background: #0C2B27;
+          color: #FFFFFF;
+          padding: 5px 10px;
+          border-radius: 6px;
+          font-size: 11px;
+          font-weight: 800;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+          pointer-events: none;
+        }
+
+        .pb-tooltip-arrow {
+          position: absolute;
+          bottom: -4px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 0;
+          height: 0;
+          border-left: 4px solid transparent;
+          border-right: 4px solid transparent;
+          border-top: 4px solid #0C2B27;
+        }
+
+        .pb-chart-x-labels {
+          display: flex;
+          justify-content: space-between;
+          padding: 0 25px 0 60px;
+          font-size: 11px;
+          color: #94A3B8;
+          font-weight: 600;
+          margin-top: 2px;
+        }
+
+        /* Top Products */
+        .pb-top-products-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 16px;
+        }
+
+        .pb-top-products-title {
+          font-size: 16px;
+          font-weight: 800;
+          color: #0F172A;
+          margin: 0;
+        }
+
+        .pb-products-rank-list {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .pb-ranked-item {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 6px 0;
+        }
+
+        .pb-rank-number {
+          width: 22px;
+          height: 22px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          font-weight: 800;
+          flex-shrink: 0;
+        }
+
+        .pb-rank-number.rank-1, .pb-rank-number.rank-3 {
+          background: #ECFDF5;
+          color: #059669;
+        }
+
+        .pb-rank-number.rank-2 {
+          background: #EFF6FF;
+          color: #2563EB;
+        }
+
+        .pb-product-thumbnail-box {
+          width: 44px;
+          height: 44px;
+          border-radius: 10px;
+          background: #F8FAFC;
+          border: 1px solid #E2E8F0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
+          flex-shrink: 0;
+        }
+
+        .pb-product-title {
+          font-size: 13.5px;
+          font-weight: 700;
+          color: #0F172A;
+          line-height: 1.25;
+        }
+
+        .pb-product-sold {
+          font-size: 12px;
+          color: #64748B;
+          margin-top: 2px;
+        }
+
+        .pb-view-all-products-link {
+          margin-top: 14px;
+          padding: 8px 0 0 0;
+          background: transparent;
+          border: none;
+          color: #059669;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          display: inline-block;
+          text-align: left;
+        }
+
+        .pb-view-all-products-link:hover {
+          text-decoration: underline;
+        }
+
+        /* RECENT ORDERS CARD */
+        .pb-recent-orders-card {
+          background: #FFFFFF;
+          border-radius: 16px;
+          border: 1px solid #E2E8F0;
+          padding: 20px 22px;
+          box-sizing: border-box;
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+        }
+
+        .pb-orders-card-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 16px;
+        }
+
+        .pb-orders-title-wrap {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .pb-orders-heading {
+          font-size: 16px;
+          font-weight: 800;
+          color: #0F172A;
+          margin: 0;
+        }
+
+        .pb-view-all-orders-btn {
+          background: transparent;
+          border: none;
+          color: #059669;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+        }
+
+        .pb-view-all-orders-btn:hover {
+          text-decoration: underline;
+        }
+
+        /* Table */
+        .pb-desktop-orders-table-wrapper {
+          overflow-x: auto;
+        }
+
+        .pb-orders-table {
+          width: 100%;
+          border-collapse: collapse;
+          text-align: left;
+          font-size: 13.5px;
+        }
+
+        .pb-orders-table th {
+          padding: 10px 14px;
+          color: #64748B;
+          font-weight: 600;
+          font-size: 12.5px;
+          border-bottom: 1px solid #E2E8F0;
+        }
+
+        .pb-orders-table td {
+          padding: 14px;
+          border-bottom: 1px solid #F1F5F9;
+        }
+
+        .pb-status-badge {
+          display: inline-block;
+          padding: 3px 10px;
+          border-radius: 20px;
+          font-size: 11.5px;
+          font-weight: 700;
+        }
+
+        .pb-status-badge.pending {
+          background: #FEF3C7;
+          color: #92400E;
+        }
+
+        .pb-status-badge.processing {
+          background: #DBEAFE;
+          color: #1E40AF;
+        }
+
+        .pb-status-badge.shipped {
+          background: #D1FAE5;
+          color: #065F46;
+        }
+
+        .pb-status-badge.delivered {
+          background: #DCFCE7;
+          color: #166534;
+        }
+
+        /* Mobile Order Cards */
+        .pb-mobile-orders-cards {
+          display: none;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .pb-mobile-order-card {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 12px;
+          border-radius: 12px;
+          background: #F8FAFC;
+          border: 1px solid #E2E8F0;
+        }
+
+        .pb-card-product-icon {
+          width: 44px;
+          height: 44px;
+          border-radius: 10px;
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
+          flex-shrink: 0;
+        }
+
+        .pb-card-mid {
+          flex: 1;
+        }
+
+        .pb-card-order-id {
+          font-size: 13px;
+          font-weight: 800;
+          color: #0F172A;
+        }
+
+        .pb-card-amount {
+          font-size: 13px;
+          font-weight: 800;
+          color: #059669;
+          margin-top: 1px;
+        }
+
+        .pb-card-date {
+          font-size: 11px;
+          color: #94A3B8;
+          margin-top: 2px;
+        }
+
+        /* Mobile Bottom Bar */
+        .pb-mobile-bottom-bar {
+          display: none;
+          position: fixed;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          height: 60px;
+          background: #FFFFFF;
+          border-top: 1px solid #E2E8F0;
+          z-index: 1000;
+          justify-content: space-around;
+          align-items: center;
+          box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.04);
+        }
+
+        .pb-bottom-tab {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 3px;
+          background: transparent;
+          border: none;
+          color: #64748B;
+          font-size: 10.5px;
+          font-weight: 600;
+          cursor: pointer;
+        }
+
+        .pb-bottom-tab.active {
+          color: #059669;
+          font-weight: 800;
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 1024px) {
+          .pb-stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+
+          .pb-middle-row-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        @media (max-width: 768px) {
+          .pb-sidebar {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            transform: translateX(-100%);
+            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
+          }
+
+          .pb-sidebar.open {
+            transform: translateX(0);
+          }
+
+          .pb-close-drawer-btn {
+            display: block;
+          }
+
+          .pb-mobile-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            z-index: 99;
+          }
+
+          .pb-hamburger-btn {
+            display: flex;
+          }
+
+          .pb-mobile-brand {
+            display: flex;
+          }
+
+          .pb-top-bar {
+            padding: 0 16px;
+          }
+
+          .pb-search-box {
+            display: none;
+          }
+
+          .pb-content-container {
+            padding: 16px 14px 80px 14px;
+          }
+
+          .pb-desktop-orders-table-wrapper {
+            display: none;
+          }
+
+          .pb-mobile-orders-cards {
+            display: flex;
+          }
+
+          .pb-mobile-bottom-bar {
+            display: flex;
+          }
+
+          .pb-stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+          }
+
+          .pb-stat-card {
+            padding: 14px 14px;
+          }
+
+          .pb-stat-value {
+            font-size: 20px;
+          }
+
+          .pb-page-header-row {
+            margin-bottom: 16px;
+          }
+
+          .pb-welcome-title {
+            font-size: 20px;
+          }
+        }
+      `}</style>
+
+{showAddModal && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -4681,6 +6009,7 @@ If delivered goods fail quality inspection due to printing defects, incorrect si
           </div>
         </div>
       )}
+
 
 </div>
   );

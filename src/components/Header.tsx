@@ -42,13 +42,6 @@ export default function Header({ currentLang, onLangChange, seller, onOpenDashbo
         {/* Navigation & Utilities (Desktop) */}
         <nav className="header-center-navs desktop-only-nav">
           <div className="header-center-navs-content">
-            <a href="#support">
-              <span>{currentLang === 'bn' ? 'প্যাকব্যাং একাডেমি' : 'Packaging Academy'}</span>
-              <span className="new-badge">NEW</span>
-            </a>
-          </div>
-
-          <div className="header-center-navs-content">
             <a href="#faq">
               <span>{currentLang === 'bn' ? 'সাপোর্ট ও সাহায্য' : 'Help Center'}</span>
             </a>
@@ -185,14 +178,6 @@ export default function Header({ currentLang, onLangChange, seller, onOpenDashbo
                   </button>
                 )}
                 
-                <a 
-                  href="#support" 
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="mobile-drawer-link"
-                >
-                  🎓 {currentLang === 'bn' ? 'প্যাকব্যাং একাডেমি' : 'Packaging Academy'}
-                </a>
-
                 <a 
                   href="#faq" 
                   onClick={() => setMobileMenuOpen(false)}
