@@ -152,6 +152,14 @@ export default function SellerDashboard({
   const [globalSearch, setGlobalSearch] = useState('');
   const [showAllOrders, setShowAllOrders] = useState(false);
   const [activeChartPoint, setActiveChartPoint] = useState<number>(3);
+  const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
+  const [readCustomOrderIds, setReadCustomOrderIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('pb_read_custom_orders') || '[]');
+    } catch {
+      return [];
+    }
+  });
 
   // Store API base URL for live marketplace sync
   const storeApiUrl = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
@@ -334,6 +342,12 @@ export default function SellerDashboard({
     fetchSellerOrders();
     fetchSellerMetrics();
     fetchCategories();
+
+    // Auto-refresh custom orders every 25 seconds for real-time customer post notifications
+    const pollTimer = setInterval(() => {
+      fetchApprovedOrders();
+    }, 25000);
+    return () => clearInterval(pollTimer);
   }, [activeTab, currentSeller.id, currentSeller.phone]);
 
   // Live Marketplace Products Integration
@@ -405,6 +419,29 @@ export default function SellerDashboard({
       targetBudget: '৳ 38.00 / box'
     }
   ]);
+
+  // Unread customer custom orders for notification icon
+  const unreadCustomOrders = bids.filter(b => !readCustomOrderIds.includes(b.id));
+
+  const markCustomOrdersAsRead = () => {
+    const allIds = bids.map(b => b.id);
+    setReadCustomOrderIds(allIds);
+    try {
+      localStorage.setItem('pb_read_custom_orders', JSON.stringify(allIds));
+    } catch (e) {}
+  };
+
+  const handleCustomOrderNotificationClick = (orderId: string) => {
+    if (!readCustomOrderIds.includes(orderId)) {
+      const updated = [...readCustomOrderIds, orderId];
+      setReadCustomOrderIds(updated);
+      try {
+        localStorage.setItem('pb_read_custom_orders', JSON.stringify(updated));
+      } catch (e) {}
+    }
+    setShowNotificationDropdown(false);
+    setActiveTab('bids');
+  };
 
   // Form state for adding product
   const [newProductName, setNewProductName] = useState('');
@@ -1060,14 +1097,90 @@ export default function SellerDashboard({
 
           <div className="pb-top-bar-right">
             {/* Notification Bell */}
-            <div className="pb-bell-wrapper" title="3 Notifications">
-              <button type="button" className="pb-bell-btn">
+            <div className="pb-bell-wrapper">
+              <button 
+                type="button" 
+                className="pb-bell-btn"
+                onClick={() => setShowNotificationDropdown(prev => !prev)}
+                title={unreadCustomOrders.length > 0 ? `${unreadCustomOrders.length} New Custom Orders` : 'Notifications'}
+              >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                   <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                 </svg>
-                <span className="pb-bell-badge">3</span>
+                {unreadCustomOrders.length > 0 && (
+                  <span className="pb-bell-badge">{unreadCustomOrders.length}</span>
+                )}
               </button>
+
+              {/* Notification Popup Dropdown */}
+              {showNotificationDropdown && (
+                <div className="pb-notif-dropdown">
+                  <div className="pb-notif-header">
+                    <div style={{ fontWeight: 800, fontSize: '13.5px', color: '#0F172A' }}>
+                      🔔 {currentLang === 'bn' ? 'কাস্টম অর্ডার নোটিফিকেশন' : 'Custom Order Notifications'}
+                    </div>
+                    {unreadCustomOrders.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={markCustomOrdersAsRead}
+                        style={{ background: 'transparent', border: 'none', color: '#059669', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        {currentLang === 'bn' ? 'সব পঠিত করুন' : 'Mark all read'}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="pb-notif-list">
+                    {bids.length === 0 ? (
+                      <div style={{ padding: '24px 16px', textAlign: 'center', color: '#94A3B8', fontSize: '12.5px' }}>
+                        {currentLang === 'bn' ? 'কোনো নতুন কাস্টম অর্ডার নেই' : 'No new custom order posts'}
+                      </div>
+                    ) : (
+                      bids.slice(0, 6).map((order) => {
+                        const isUnread = !readCustomOrderIds.includes(order.id);
+                        return (
+                          <div
+                            key={order.id}
+                            className={`pb-notif-item ${isUnread ? 'unread' : ''}`}
+                            onClick={() => handleCustomOrderNotificationClick(order.id)}
+                          >
+                            <div className="pb-notif-icon">📦</div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div className="pb-notif-item-title">
+                                {currentLang === 'bn' ? 'নতুন কাস্টম অর্ডার পোস্ট হয়েছে' : 'New Custom Order Posted'}
+                              </div>
+                              <div className="pb-notif-item-desc" title={order.requestText}>
+                                {order.title || order.requestText}
+                              </div>
+                              <div className="pb-notif-item-meta">
+                                <span>{order.quantity.toLocaleString()} {order.unit || 'pcs'}</span>
+                                <span>•</span>
+                                <span style={{ color: '#059669', fontWeight: 700 }}>{order.targetBudget}</span>
+                                <span>•</span>
+                                <span>{order.buyer}</span>
+                              </div>
+                            </div>
+                            {isUnread && <span className="pb-notif-dot" />}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {bids.length > 0 && (
+                    <div className="pb-notif-footer">
+                      <button
+                        type="button"
+                        onClick={() => { setShowNotificationDropdown(false); setActiveTab('bids'); }}
+                        style={{ width: '100%', background: 'transparent', border: 'none', color: '#059669', fontSize: '12px', fontWeight: 700, cursor: 'pointer', padding: '6px' }}
+                      >
+                        {currentLang === 'bn' ? 'সকল কোটেশন ও বিড দেখুন →' : 'View All Wholesale Inquiries →'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* User Profile Pill with Dropdown */}
@@ -3765,6 +3878,112 @@ export default function SellerDashboard({
           display: flex;
           align-items: center;
           gap: 16px;
+        }
+
+        
+        /* Notification Dropdown */
+        .pb-notif-dropdown {
+          position: absolute;
+          top: calc(100% + 10px);
+          right: 0;
+          width: 330px;
+          background: #FFFFFF;
+          border-radius: 14px;
+          box-shadow: 0 12px 36px rgba(0, 0, 0, 0.14);
+          border: 1px solid #E2E8F0;
+          z-index: 1000;
+          overflow: hidden;
+          animation: pbDropdownFade 0.15s ease-out;
+        }
+
+        @keyframes pbDropdownFade {
+          from { opacity: 0; transform: translateY(-6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        .pb-notif-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px 16px;
+          border-bottom: 1px solid #F1F5F9;
+          background: #F8FAFC;
+        }
+
+        .pb-notif-list {
+          max-height: 330px;
+          overflow-y: auto;
+        }
+
+        .pb-notif-item {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          padding: 12px 14px;
+          border-bottom: 1px solid #F1F5F9;
+          cursor: pointer;
+          transition: background 0.15s;
+        }
+
+        .pb-notif-item:hover {
+          background: #F8FAFC;
+        }
+
+        .pb-notif-item.unread {
+          background: #F0FDF4;
+        }
+
+        .pb-notif-icon {
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          background: #DCFCE7;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 16px;
+          flex-shrink: 0;
+        }
+
+        .pb-notif-item-title {
+          font-size: 12px;
+          font-weight: 800;
+          color: #0F172A;
+          margin-bottom: 2px;
+        }
+
+        .pb-notif-item-desc {
+          font-size: 11.5px;
+          color: #475569;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          line-height: 1.3;
+        }
+
+        .pb-notif-item-meta {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          font-size: 10.5px;
+          color: #64748B;
+          margin-top: 4px;
+        }
+
+        .pb-notif-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: #10B981;
+          margin-top: 5px;
+          flex-shrink: 0;
+        }
+
+        .pb-notif-footer {
+          padding: 8px 12px;
+          border-top: 1px solid #F1F5F9;
+          text-align: center;
+          background: #F8FAFC;
         }
 
         .pb-bell-wrapper {
