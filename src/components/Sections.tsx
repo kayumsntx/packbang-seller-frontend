@@ -176,56 +176,56 @@ export function Benefits({ currentLang }: SectionsProps) {
   );
 }
 
-export function SellerStory({ currentLang }: SectionsProps) {
-  return (
-    <section className="cms-section bg-white" id="stories">
-      <div className="section-container">
-        <div className="section-header-box">
-          <h2 className="section-title">
-            {currentLang === 'bn' ? 'সফল প্যাকেজিং উদ্যোক্তাদের গল্প' : "Packaging Sellers' Success Stories"}
-          </h2>
-          <p className="section-subtitle">
-            {currentLang === 'bn'
-              ? 'প্যাকব্যাং-এর মাধ্যমে কীভাবে সাধারণ বক্স ও পলি কারখানাগুলো ব্র্যান্ডে রূপান্তরিত হয়েছে।'
-              : 'How local packet workshops and carton makers multiplied their sales nationwide through Packbang.'}
-          </p>
-        </div>
-        <div className="stories-grid">
-          <div className="story-card">
-            <div className="story-media-wrap">
-              <img src="/seller-rafiqul.jpg" alt="Rafiqul Islam" className="story-img" />
-              <div className="play-video-btn">▶</div>
-            </div>
-            <div className="story-card-body">
-              <div className="story-author-name">Rafiqul Islam</div>
-              <div className="story-author-role">Founder, GreenPack Poly & Cartons</div>
-              <p className="story-quote">
-                {currentLang === 'bn'
-                  ? '"পুরান ঢাকার ছোট প্রেস থেকে আজ আমরা প্যাকব্যাং-এর মাধ্যমে প্রতি সপ্তাহে ৫০,০০০+ কুরিয়ার পলি ব্যাগ এবং কাস্টম সাইজ কার্টন বক্স সরবরাহ করছি দেশের বিভিন্ন জেলার ব্র্যান্ডগুলোতে। বিক্রয় বেড়েছে চারগুণ!"'
-                  : '"From a modest printing press in Old Dhaka, we now supply 50,000+ courier poly mailers and custom carton boxes every week to eCommerce brands across Bangladesh via Packbang."'}
-              </p>
-            </div>
-          </div>
-          <div className="story-card">
-            <div className="story-media-wrap">
-              <img src="/seller-sumaiya.jpg" alt="Sumaiya Jahan" className="story-img" />
-              <div className="play-video-btn">▶</div>
-            </div>
-            <div className="story-card-body">
-              <div className="story-author-name">Sumaiya Jahan</div>
-              <div className="story-author-role">Owner, CraftGift & Bubble Solutions</div>
-              <p className="story-quote">
-                {currentLang === 'bn'
-                  ? '"প্রিমিয়াম হ্যান্ডমেড গিফট প্যাকেট এবং হাই-গ্রেড বাবল র‍্যাপ রোল সরবরাহ করে প্যাকব্যাং-এ আমার যাত্রা শুরু। অনলাইনে বুটিক শপ এবং গিফট স্টোরগুলো আমাদের নিয়মিত ক্লায়েন্ট।"'
-                  : '"Supplying premium gift packets, customized stickers, and protective bubble wrap on Packbang allowed us to secure repeat contracts with hundreds of boutique gift shops."'}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
+// export function SellerStory({ currentLang }: SectionsProps) {
+//   return (
+//     <section className="cms-section bg-white" id="stories">
+//       <div className="section-container">
+//         <div className="section-header-box">
+//           <h2 className="section-title">
+//             {currentLang === 'bn' ? 'সফল প্যাকেজিং উদ্যোক্তাদের গল্প' : "Packaging Sellers' Success Stories"}
+//           </h2>
+//           <p className="section-subtitle">
+//             {currentLang === 'bn'
+//               ? 'প্যাকব্যাং-এর মাধ্যমে কীভাবে সাধারণ বক্স ও পলি কারখানাগুলো ব্র্যান্ডে রূপান্তরিত হয়েছে।'
+//               : 'How local packet workshops and carton makers multiplied their sales nationwide through Packbang.'}
+//           </p>
+//         </div>
+//         <div className="stories-grid">
+//           <div className="story-card">
+//             <div className="story-media-wrap">
+//               <img src="/seller-rafiqul.jpg" alt="Rafiqul Islam" className="story-img" />
+//               <div className="play-video-btn">▶</div>
+//             </div>
+//             <div className="story-card-body">
+//               <div className="story-author-name">Rafiqul Islam</div>
+//               <div className="story-author-role">Founder, GreenPack Poly & Cartons</div>
+//               <p className="story-quote">
+//                 {currentLang === 'bn'
+//                   ? '"পুরান ঢাকার ছোট প্রেস থেকে আজ আমরা প্যাকব্যাং-এর মাধ্যমে প্রতি সপ্তাহে ৫০,০০০+ কুরিয়ার পলি ব্যাগ এবং কাস্টম সাইজ কার্টন বক্স সরবরাহ করছি দেশের বিভিন্ন জেলার ব্র্যান্ডগুলোতে। বিক্রয় বেড়েছে চারগুণ!"'
+//                   : '"From a modest printing press in Old Dhaka, we now supply 50,000+ courier poly mailers and custom carton boxes every week to eCommerce brands across Bangladesh via Packbang."'}
+//               </p>
+//             </div>
+//           </div>
+//           <div className="story-card">
+//             <div className="story-media-wrap">
+//               <img src="/seller-sumaiya.jpg" alt="Sumaiya Jahan" className="story-img" />
+//               <div className="play-video-btn">▶</div>
+//             </div>
+//             <div className="story-card-body">
+//               <div className="story-author-name">Sumaiya Jahan</div>
+//               <div className="story-author-role">Owner, CraftGift & Bubble Solutions</div>
+//               <p className="story-quote">
+//                 {currentLang === 'bn'
+//                   ? '"প্রিমিয়াম হ্যান্ডমেড গিফট প্যাকেট এবং হাই-গ্রেড বাবল র‍্যাপ রোল সরবরাহ করে প্যাকব্যাং-এ আমার যাত্রা শুরু। অনলাইনে বুটিক শপ এবং গিফট স্টোরগুলো আমাদের নিয়মিত ক্লায়েন্ট।"'
+//                   : '"Supplying premium gift packets, customized stickers, and protective bubble wrap on Packbang allowed us to secure repeat contracts with hundreds of boutique gift shops."'}
+//               </p>
+//             </div>
+//           </div>
+//         </div>
+//       </div>
+//     </section>
+//   );
+// }
 
 export function Programs({ currentLang }: SectionsProps) {
   return (
