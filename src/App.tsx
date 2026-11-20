@@ -5,7 +5,6 @@ import SellerDashboard, { type SellerProfile } from './components/SellerDashboar
 import { 
   Benefits, 
   HowItWorks, 
-  SellerStory, 
   Programs, 
   SupportHub, 
   Faq, 
@@ -63,8 +62,7 @@ export default function App() {
         />
         <Benefits currentLang={currentLang} />
         <HowItWorks currentLang={currentLang} />
-        <SellerStory currentLang={currentLang} />
-        <Programs currentLang={currentLang} />
+   <Programs currentLang={currentLang} />
         <SupportHub currentLang={currentLang} />
         <Faq currentLang={currentLang} />
         <CtaRibbon currentLang={currentLang} />

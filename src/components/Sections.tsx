@@ -426,7 +426,7 @@ export function QuickMenuAndFab({ currentLang }: SectionsProps) {
           {[
             { id: 'benefits', label: currentLang === 'bn' ? 'সুবিধা' : 'Benefits' },
             { id: 'steps', label: currentLang === 'bn' ? 'ধাপসমূহ' : 'Steps' },
-            { id: 'stories', label: currentLang === 'bn' ? 'গল্প' : 'Stories' },
+            
             { id: 'programs', label: currentLang === 'bn' ? 'প্রোগ্রাম' : 'Programs' },
             { id: 'support', label: currentLang === 'bn' ? 'সাপোর্ট' : 'Support' },
             { id: 'faq', label: currentLang === 'bn' ? 'প্রশ্নোত্তর' : 'FAQs' },
