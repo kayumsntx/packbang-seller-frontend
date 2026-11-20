@@ -14,6 +14,15 @@ export default function Footer() {
           </div>
 
           <div className="copyright-item">
+            <div className="copyright-item-title">Technology Partner</div>
+            <div className="copyright-item-link">
+             <a href="https://www.linkedin.com/in/md-kayum-hossain/" target="_blank" rel="noopener noreferrer"><i className="fab fa-linkedin-in"></i> Contact Developer</a>
+              
+           
+            </div>
+          </div>
+
+          <div className="copyright-item">
             <div className="copyright-item-title">Packaging Categories</div>
             <div className="copyright-item-link">
               <a href="#" className="copyright-item-link-a">Courier Poly Mailers</a>
