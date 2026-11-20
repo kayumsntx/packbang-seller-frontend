@@ -11,7 +11,7 @@ interface AuthCardProps {
 
 
 export default function AuthCard({ currentLang, onOpenDashboard, onSellerChange }: AuthCardProps) {
-  const [authMode, setAuthMode] = useState<'password' | 'sms' | 'register' | 'qr'>('password');
+  const [authMode, setAuthMode] = useState<'password' | 'sms' | 'register' | 'qr' | 'forgot'>('password');
   const [account, setAccount] = useState('');
   const [password, setPassword] = useState('');
   const [shopName, setShopName] = useState('');
@@ -20,6 +20,14 @@ export default function AuthCard({ currentLang, onOpenDashboard, onSellerChange 
   const [countdown, setCountdown] = useState(0);
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'error' | 'success' } | null>(null);
+
+  // Forgot Password State
+  const [forgotStep, setForgotStep] = useState<1 | 2>(1);
+  const [resetPhone, setResetPhone] = useState('');
+  const [resetOtp, setResetOtp] = useState('');
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetConfirmPassword, setResetConfirmPassword] = useState('');
+  const [showResetPassword, setShowResetPassword] = useState(false);
   
   // Persisted logged-in seller session
   const [loggedInSeller, setLoggedInSeller] = useState<SellerProfile | null>(() => {
@@ -74,6 +82,104 @@ export default function AuthCard({ currentLang, onOpenDashboard, onSellerChange 
       setStatusMessage({ 
         text: currentLang === 'bn' ? 'ওটিপি কোড পাঠানো হয়েছে (+880)' : 'OTP sent to +880' + account, 
         type: 'success' 
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Send Forgot Password OTP
+  const handleSendForgotOtp = async () => {
+    const targetPhone = resetPhone.trim() || account.trim();
+    if (!targetPhone) {
+      setStatusMessage({
+        text: currentLang === 'bn' ? 'অনুগ্রহ করে আপনার রেজিস্টার্ড মোবাইল নাম্বার দিন' : 'Please enter your registered mobile number',
+        type: 'error'
+      });
+      return;
+    }
+
+    setLoading(true);
+    setStatusMessage(null);
+
+    try {
+      const res = await axios.post(`${API_URL}/forgot-password/send-otp`, { phone: targetPhone });
+      setCountdown(60);
+      setForgotStep(2);
+      const debugText = res.data.debugCode ? ` (Code: ${res.data.debugCode})` : '';
+      setStatusMessage({
+        text: (res.data.message || (currentLang === 'bn' ? 'ওটিপি কোড পাঠানো হয়েছে' : 'OTP sent successfully!')) + debugText,
+        type: 'success'
+      });
+    } catch (err: any) {
+      const errMsg = err?.response?.data?.message || err.message || (currentLang === 'bn' ? 'ওটিপি পাঠাতে ব্যর্থ হয়েছে' : 'Failed to send OTP');
+      setStatusMessage({
+        text: errMsg,
+        type: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Submit New Password with OTP
+  const handleResetPasswordSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const targetPhone = resetPhone.trim() || account.trim();
+
+    if (!resetOtp.trim()) {
+      setStatusMessage({
+        text: currentLang === 'bn' ? 'অনুগ্রহ করে ৬-সংখ্যার ওটিপি কোড দিন' : 'Please enter the 6-digit OTP code',
+        type: 'error'
+      });
+      return;
+    }
+
+    if (resetNewPassword.length < 6) {
+      setStatusMessage({
+        text: currentLang === 'bn' ? 'পাসওয়ার্ড ন্যূনতম ৬ অক্ষরের হতে হবে' : 'Password must be at least 6 characters long',
+        type: 'error'
+      });
+      return;
+    }
+
+    if (resetNewPassword !== resetConfirmPassword) {
+      setStatusMessage({
+        text: currentLang === 'bn' ? 'পাসওয়ার্ড দুটি মেলেনি' : 'Passwords do not match',
+        type: 'error'
+      });
+      return;
+    }
+
+    setLoading(true);
+    setStatusMessage(null);
+
+    try {
+      const res = await axios.post(`${API_URL}/forgot-password/reset`, {
+        phone: targetPhone,
+        otp: resetOtp.trim(),
+        newPassword: resetNewPassword
+      });
+
+      const { token, seller } = res.data;
+      if (token) localStorage.setItem('packbang_seller_token', token);
+      if (seller) {
+        localStorage.setItem('packbang_seller_user', JSON.stringify(seller));
+        setLoggedInSeller(seller);
+        if (onSellerChange) onSellerChange(seller);
+        if (onOpenDashboard) onOpenDashboard();
+      }
+
+      setStatusMessage({
+        text: res.data.message || (currentLang === 'bn' ? 'পাসওয়ার্ড সফলভাবে পরিবর্তন হয়েছে!' : 'Password reset successfully!'),
+        type: 'success'
+      });
+
+    } catch (err: any) {
+      const errMsg = err?.response?.data?.message || err.message || (currentLang === 'bn' ? 'পাসওয়ার্ড পরিবর্তন ব্যর্থ হয়েছে' : 'Failed to reset password');
+      setStatusMessage({
+        text: errMsg,
+        type: 'error'
       });
     } finally {
       setLoading(false);
@@ -300,6 +406,178 @@ export default function AuthCard({ currentLang, onOpenDashboard, onSellerChange 
             </button>
           </div>
         </div>
+      ) : authMode === 'forgot' ? (
+        <div className="login-card-inner">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <button
+              type="button"
+              onClick={() => { setAuthMode('password'); setStatusMessage(null); }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--pb-primary)',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px 0'
+              }}
+            >
+              ← {currentLang === 'bn' ? 'লগইনে ফিরে যান' : 'Back to Login'}
+            </button>
+            <span style={{ fontSize: '11px', color: 'var(--pb-text-muted)', fontWeight: 600 }}>
+              {forgotStep === 1 
+                ? (currentLang === 'bn' ? 'ধাপ ১/২' : 'Step 1 of 2')
+                : (currentLang === 'bn' ? 'ধাপ ২/২' : 'Step 2 of 2')}
+            </span>
+          </div>
+
+          <div style={{ textAlign: 'left', marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--pb-text-title)', margin: '0 0 6px 0' }}>
+              {currentLang === 'bn' ? 'পাসওয়ার্ড রিসেট করুন' : 'Reset Your Password'}
+            </h3>
+            <p style={{ fontSize: '12.5px', color: 'var(--pb-text-muted)', margin: 0, lineHeight: 1.4 }}>
+              {forgotStep === 1
+                ? (currentLang === 'bn' 
+                    ? 'আপনার রেজিস্টার্ড মোবাইল নাম্বারে একটি ৬-সংখ্যার ওটিপি কোড পাঠানো হবে।' 
+                    : 'Enter your registered phone number to receive a 6-digit OTP verification code.')
+                : (currentLang === 'bn'
+                    ? `+880${resetPhone || account} নাম্বারে পাঠানো ওটিপি কোড ও নতুন পাসওয়ার্ড দিন।`
+                    : `Enter the code sent to +880${resetPhone || account} and set your new password.`)}
+            </p>
+          </div>
+
+          {statusMessage && (
+            <div className={`status-alert ${statusMessage.type}`}>
+              {statusMessage.text}
+            </div>
+          )}
+
+          {forgotStep === 1 ? (
+            <form onSubmit={(e) => { e.preventDefault(); handleSendForgotOtp(); }} className="login-form">
+              <div className="form-item">
+                <label className="form-label">
+                  {currentLang === 'bn' ? 'রেজিস্টার্ড মোবাইল নাম্বার' : 'Registered Mobile Number'}
+                </label>
+                <div className="input-wrap">
+                  <span className="input-prefix">+880</span>
+                  <input
+                    type="text"
+                    value={resetPhone}
+                    onChange={(e) => setResetPhone(e.target.value)}
+                    placeholder="e.g. 017XXXXXXXX"
+                    required
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="sign-in-button"
+                disabled={loading}
+              >
+                {loading
+                  ? (currentLang === 'bn' ? 'কোড পাঠানো হচ্ছে...' : 'Sending Code...')
+                  : (currentLang === 'bn' ? 'রিসেট কোড পাঠান →' : 'Send Reset Code →')}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleResetPasswordSubmit} className="login-form">
+              {/* 6-digit OTP code */}
+              <div className="form-item">
+                <label className="form-label">
+                  {currentLang === 'bn' ? '৬-সংখ্যার ওটিপি কোড' : '6-Digit OTP Code'}
+                </label>
+                <div className="input-wrap sms-input-wrap">
+                  <input
+                    type="text"
+                    value={resetOtp}
+                    onChange={(e) => setResetOtp(e.target.value)}
+                    placeholder="6-digit code"
+                    maxLength={6}
+                    required
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    className="send-sms-btn"
+                    disabled={countdown > 0 || loading}
+                    onClick={handleSendForgotOtp}
+                  >
+                    {countdown > 0 ? `${countdown}s` : (currentLang === 'bn' ? 'পুনরায় পাঠান' : 'Resend')}
+                  </button>
+                </div>
+              </div>
+
+              {/* New Password */}
+              <div className="form-item">
+                <label className="form-label">{currentLang === 'bn' ? 'নতুন পাসওয়ার্ড' : 'New Password'}</label>
+                <div className="input-wrap">
+                  <input
+                    type={showResetPassword ? 'text' : 'password'}
+                    value={resetNewPassword}
+                    onChange={(e) => setResetNewPassword(e.target.value)}
+                    placeholder="Minimum 6 characters"
+                    required
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    className="eye-toggle"
+                    onClick={() => setShowResetPassword(!showResetPassword)}
+                  >
+                    {showResetPassword ? '🙈' : '👁️'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirm New Password */}
+              <div className="form-item">
+                <label className="form-label">{currentLang === 'bn' ? 'নতুন পাসওয়ার্ড নিশ্চিত করুন' : 'Confirm New Password'}</label>
+                <div className="input-wrap">
+                  <input
+                    type={showResetPassword ? 'text' : 'password'}
+                    value={resetConfirmPassword}
+                    onChange={(e) => setResetConfirmPassword(e.target.value)}
+                    placeholder="Re-enter new password"
+                    required
+                    minLength={6}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="sign-in-button"
+                disabled={loading}
+              >
+                {loading
+                  ? (currentLang === 'bn' ? 'সংরক্ষণ করা হচ্ছে...' : 'Updating...')
+                  : (currentLang === 'bn' ? 'পাসওয়ার্ড পরিবর্তন ও লগইন' : 'Reset Password & Login')}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setForgotStep(1)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--pb-text-muted)',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  marginTop: '8px',
+                  textDecoration: 'underline'
+                }}
+              >
+                {currentLang === 'bn' ? 'নাম্বার পরিবর্তন করতে চান?' : 'Change Phone Number'}
+              </button>
+            </form>
+          )}
+        </div>
       ) : (
         <div className="login-card-inner">
           {/* Header Tabs: Password | OTP | Register */}
@@ -369,9 +647,19 @@ export default function AuthCard({ currentLang, onOpenDashboard, onSellerChange 
                 <div className="form-label-row">
                   <label className="form-label">{currentLang === 'bn' ? 'পাসওয়ার্ড' : 'Password'}</label>
                   {authMode === 'password' && (
-                    <a href="#" className="forgot-link">
+                    <button
+                      type="button"
+                      className="forgot-link"
+                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                      onClick={() => {
+                        setAuthMode('forgot');
+                        setForgotStep(1);
+                        setResetPhone(account);
+                        setStatusMessage(null);
+                      }}
+                    >
                       {currentLang === 'bn' ? 'পাসওয়ার্ড ভুলে গেছেন?' : 'Forgot password?'}
-                    </a>
+                    </button>
                   )}
                 </div>
                 <div className="input-wrap">
