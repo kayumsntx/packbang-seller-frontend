@@ -15,7 +15,14 @@ import Footer from './components/Footer';
 
 export default function App() {
   const [currentLang, setCurrentLang] = useState<'en' | 'bn'>('en');
-  const [currentView, setCurrentView] = useState<'landing' | 'dashboard'>('landing');
+  const [currentView, setCurrentView] = useState<'landing' | 'dashboard'>(() => {
+    try {
+      const saved = localStorage.getItem('packbang_seller_user');
+      return saved ? 'dashboard' : 'landing';
+    } catch {
+      return 'landing';
+    }
+  });
   const [seller, setSeller] = useState<SellerProfile | null>(() => {
     try {
       const saved = localStorage.getItem('packbang_seller_user');

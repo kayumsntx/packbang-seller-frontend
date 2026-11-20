@@ -123,6 +123,8 @@ export default function AuthCard({ currentLang, onOpenDashboard, onSellerChange 
         if (seller) {
           localStorage.setItem('packbang_seller_user', JSON.stringify(seller));
           setLoggedInSeller(seller);
+          if (onSellerChange) onSellerChange(seller);
+          if (onOpenDashboard) onOpenDashboard();
         }
 
         setStatusMessage({
@@ -142,6 +144,8 @@ export default function AuthCard({ currentLang, onOpenDashboard, onSellerChange 
         if (seller) {
           localStorage.setItem('packbang_seller_user', JSON.stringify(seller));
           setLoggedInSeller(seller);
+          if (onSellerChange) onSellerChange(seller);
+          if (onOpenDashboard) onOpenDashboard();
         }
 
         setStatusMessage({
@@ -212,7 +216,10 @@ export default function AuthCard({ currentLang, onOpenDashboard, onSellerChange 
             type="button"
             className="sign-in-button"
             style={{ marginBottom: '12px' }}
-            onClick={() => { if (onOpenDashboard) onOpenDashboard(); }}
+            onClick={() => {
+              if (onSellerChange) onSellerChange(loggedInSeller);
+              if (onOpenDashboard) onOpenDashboard();
+            }}
           >
             {currentLang === 'bn' ? 'ড্যাশবোর্ডে প্রবেশ করুন' : 'GO TO SELLER DASHBOARD'}
           </button>
